@@ -1,4 +1,4 @@
-Import telebot
+import telebot
 from googlesearch import search
 import yt_dlp
 from telebot import types
@@ -23,7 +23,7 @@ SOURCE_CHANNEL = "@lb2_c"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIES_PATH = os.path.join(BASE_DIR, 'cookies.txt')
 
-# تخزين مؤقت لحالات التحميل وروابط المستخدمين
+# تخزين مؤفت لحالات التحميل وروابط المستخدمين
 user_download_requests = {}
 
 # --- دالة مخصصة لخيارات yt-dlp المستقرة ---
@@ -42,6 +42,8 @@ def get_ydl_options(output_template):
 
 # ----- إعداد الويب الصغير لمنع إيقاف البوت -----
 flask_app = Flask('')
+# تعريف متغير 'app' ليشير إلى تطبيق Flask لكي يتعرف عليه خادم الاستضافة (Uvicorn / Gunicorn) تلقائياً
+app = flask_app
 
 @flask_app.route('/')
 def home():
@@ -308,12 +310,14 @@ def run_bot_polling():
         except Exception: time.sleep(5)
 
 def start_search_bot():
-    keep_alive()
+    # تشغيل البوت في الخلفية أولاً، لكي لا يتم حظر الـ Main Thread الخاص بالسيرفر
     t_bot = Thread(target=run_bot_polling)
     t_bot.daemon = True
     t_bot.start()
 
+# استدعاء دالة تشغيل البوت
 start_search_bot()
 
+# تشغيل خادم ويب Flask في الـ Main Thread الأساسي للسيرفر، ليظل متصلاً وتتعرف عليه الاستضافة مباشرة
 if __name__ == "__main__":
-    while True: time.sleep(3600)
+    run_web_server()
