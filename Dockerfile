@@ -1,20 +1,19 @@
 FROM python:3.10-slim
 
-# تثبيت أداة ffmpeg لمعالجة الصوت والفيديو داخل السيرفر
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /code
 
 COPY ./requirements.txt /code/requirements.txt
 
-# تحديث الـ pip أولاً ثم تثبيت المكتبات لتفادي التحذيرات ومشاكل الأذونات
 RUN python -m pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /code/requirements.txt
 
 COPY . .
 
-# فتح منفذ وهمي (Port 8000) حتى تقبله منصة Back4App وميفشل النشر
-EXPOSE 8000
+# غيرنا البورت هنا إلى 5000 ليتطابق مع كود الفلاكس مالتك
+EXPOSE 5000
 
-# تشغيل البوت باستخدام ملف app.py
 CMD ["python", "app.py"]
