@@ -1,6 +1,0 @@
-name: youtubedownload
-runtime: python
-commands:
-  - name: web
-    runner: python
-    entrypoint: uvicorn bot:app --host 0.0.0.0 --port 7860
