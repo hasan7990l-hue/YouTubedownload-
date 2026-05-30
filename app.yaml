@@ -1,2 +1,6 @@
 name: youtubedownload
 runtime: python
+commands:
+  - name: web
+    runner: python
+    entrypoint: bot.py
