@@ -17,8 +17,8 @@ def home():
     return "البوت يعمل بنجاح وبدون انقطاع!"
 
 def run_server():
-    # الاستضافة تختار المنفذ تلقائياً عبر متغير البيئة PORT أو تستخدم 7860 كافتراضي
-    port = int(os.environ.get("PORT", 7860))
+    # المنصة حددت استخدام المنفذ 5000 تلقائياً كما يظهر في إعدادات الحاوية لديك
+    port = int(os.environ.get("PORT", 5000))
     server.run(host='0.0.0.0', port=port)
 
 def keep_alive():
@@ -131,7 +131,6 @@ def download_youtube_video(url, user_id):
 # دالة البحث في جوجل
 def google_search(query):
     links = []
-    # تم ضبط الاستدعاء بشكل متوافق تماماً ومستقر لتجنب مشاكل الحظر
     for result in search(query, num_results=4, lang='ar'):
         links.append(result)
     return links
