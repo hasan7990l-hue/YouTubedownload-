@@ -26,7 +26,7 @@ def keep_alive():
     t.start()
 
 # البيانات الخاصة بك التي تم دمجها في الكود مع التوكن الجديد
-ToKen = '8277082493:AAEATsIymOchgqsI3QdGwLKD3NQ4xCrMH7s'  
+ToKen = '8277082493:AAH9wW9EvzDYSN4KjbFvbhuypsYUx-KR274'  
 bot = telebot.TeleBot(ToKen)
 
 DEVELOPER_ID = 8456056018
