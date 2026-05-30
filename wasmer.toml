@@ -1,0 +1,15 @@
+[package]
+name = "username/my-telegram-bot" # استبدل username باسم حسابك
+version = "0.1.0"
+description = "Telegram Search Bot with Flask"
+
+[[commands]]
+name = "run"
+module = "bot.py" # أو استخدام الـ command الخاص بـ python إذا كنت تستخدم بيئة مخصصة
+
+[app]
+public = true
+
+[[app.routes]]
+path = "/"
+backend = "cmd:run"
