@@ -1,15 +1,16 @@
 [package]
-name = "username/my-telegram-bot" # استبدل username باسم حسابك
+name = "hasan7990l-hue/youtubedownload"
 version = "0.1.0"
 description = "Telegram Search Bot with Flask"
 
 [[commands]]
 name = "run"
-module = "bot.py" # أو استخدام الـ command الخاص بـ python إذا كنت تستخدم بيئة مخصصة
+# هنا التعديل: نقوم بتوجيه المنصة لملف bot والمتغير app ليتم تشغيله عبر خادم الويب مباشرة
+module = "bot:app" 
 
 [app]
 public = true
 
 [[app.routes]]
-path = "/"
+path = "/*"
 backend = "cmd:run"
