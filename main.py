@@ -41,8 +41,8 @@ def get_ydl_options(output_template):
     }
 
 # ----- إعداد الويب الصغير لمنع إيقاف البوت -----
-flask_app = Flask('')
-# تعريف متغير 'app' ليشير إلى تطبيق Flask لكي يتعرف عليه خادم الاستضافة (Uvicorn / Gunicorn) تلقائياً
+flask_app = Flask(__name__)
+# تعريف المتغير العالمي app المطلوب رسمياً من خوادم Uvicorn / Gunicorn للتعرف على التطبيق
 app = flask_app
 
 @flask_app.route('/')
