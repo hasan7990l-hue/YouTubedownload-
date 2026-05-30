@@ -77,6 +77,7 @@ def download_youtube_audio(url, user_id):
     
     ydl_ops = get_ydl_options(output_template)
     ydl_ops.update({
+        'format': 'bestaudio/best or ba/b',
         'writethumbnail': True, 
         'postprocessors': [
             {'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'},
@@ -307,8 +308,4 @@ if __name__ == "__main__":
     # تشغيل السيرفر المساعد أولاً لإبقاء الحاوية متصلة وحية بالمنصة
     keep_alive()
     
-    while True:
-        try: 
-            bot.polling(none_stop=True, timeout=90, long_polling_timeout=90)
-        except Exception: 
-            time.sleep(5)
+    while True
