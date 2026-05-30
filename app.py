@@ -1,316 +1,195 @@
-import telebot
-from googlesearch import search
-import yt_dlp
-from telebot import types
 import os
-import time
-import random
-import shutil 
+import asyncio
 from flask import Flask
 from threading import Thread
+import nest_asyncio
+from telethon import TelegramClient, events, Button
+from yt_dlp import YoutubeDL
 
-# إعداد سيرفر الويب الوهمي لضمان استقرار الاستضافة السحابية وعدم توقف البوت
-server = Flask('')
+# تفعيل nest_asyncio لمنع تضارب تشغيل Flask مع Telethon
+nest_asyncio.apply()
 
-@server.route('/')
-def home():
-    return "البوت يعمل بنجاح وبدون انقطاع!"
-
-def run_server():
-    # المنصة حددت استخدام المنفذ 5000 تلقائياً كما يظهر في إعدادات الحاوية لديك
-    port = int(os.environ.get("PORT", 5000))
-    server.run(host='0.0.0.0', port=port)
-
-def keep_alive():
-    t = Thread(target=run_server)
-    t.start()
-
-# البيانات الخاصة بك التي تم دمجها في الكود مع التوكن الجديد
-ToKen = '8277082493:AAH9wW9EvzDYSN4KjbFvbhuypsYUx-KR274'  
-bot = telebot.TeleBot(ToKen)
-
-DEVELOPER_ID = 8456056018
+# --- بيانات المطور والبوت المقدمة ---
 API_ID = 27485469
-API_HASH = "544459a0701b32741254945b08daebfe"
-DEVELOPER_USER = "@Eror_7"
-SOURCE_CHANNEL = "@lb2_c"
+API_HASH = '544459a0701b32741254945b08daebfe'
+BOT_TOKEN = '8277082493:AAGpRt5OG4adspV_wDH52Pk9O8TolEXJYbU'
+DEVELOPER_ID = 8456056018
+DEVELOPER_USERNAME = '@Eror_7'
 
-# تحديد المسار المطلق والكامل لملف الكوكيز لضمان العثور عليه في بيئة العمل السحابية
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-COOKIES_PATH = os.path.join(BASE_DIR, 'cookies.txt')
+# --- إعداد ملف الكوكيز ---
+# ملاحظة: قم بإنشاء ملف باسم cookies.txt في نفس المجلد وضع فيه كوكيز اليوتيوب الخاصة بك لتفادي الحظر
+COOKIES_FILE = 'cookies.txt'
+if not os.path.exists(COOKIES_FILE):
+    with open(COOKIES_FILE, 'w', encoding='utf-8') as f:
+        f.write("# Netscape HTTP Cookie File\n")
 
-# تخزين مؤفت لحالات التحميل وروابط المستخدمين
-user_download_requests = {}
+# --- إعداد تطبيق Flask (الويب الصغير) ---
+app = Flask(__name__)
 
-# --- دالة مخصصة لخيارات yt-dlp المستقرة ---
-def get_ydl_options(output_template):
-    # تحديد مسار ثابت لـ ffmpeg في بيئة Replit لضمان عمله بعد التثبيت
-    return {
-        'format': 'bestaudio/best',
-        'quiet': True,
-        'no_warnings': True,
-        'outtmpl': output_template,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'nocheckcertificate': True,
-        'ignoreerrors': False,
-        'ffmpeg_location': '/home/runner/.nix-profile/bin',
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
-    }
+@app.route('/')
+def home():
+    return """
+    <html>
+        <head>
+            <title>YouTube Downloader Bot Status</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; background-color: #2c3e50; color: white; padding-top: 50px; }
+                h1 { color: #e74c3c; }
+                .status { font-size: 24px; color: #2ecc71; }
+                .info { margin-top: 20px; font-size: 18px; color: #bdc3c7; }
+            </style>
+        </head>
+        <body>
+            <h1>YouTube Downloader Bot</h1>
+            <p class="status">● البوت يعمل بنجاح الآن</p>
+            <div class="info">
+                <p>المطور: <a href="https://t.me/Eror_7" style="color:#3498db; text-decoration:none;">@Eror_7</a></p>
+                <p>نظام الكوكيز: نشط ومفعل (cookies.txt)</p>
+            </div>
+        </body>
+    </html>
+    """
 
-# دالة لتحديث الرسائل المتحركة أثناء التحميل
-def animate_loading(chat_id, message_id, base_text, stop_event):
-    frames = ["⏳", "📥", "⚡", "✨"]
-    i = 0
-    while not stop_event.is_set():
-        try:
-            frame = frames[i % len(frames)]
-            bot.edit_message_text(f"{frame} *{base_text}...*", chat_id, message_id, parse_mode='Markdown')
-            i += 1
-            time.sleep(1.5)
-        except Exception:
-            break
+def run_flask():
+    app.run(host='0.0.0.0', port=8080)
 
-# دالة تنزيل الصوت من الرابط المباشر مع دمج الغلاف وتنظيف الحقوق وتجنب مشاكل الأسماء العربية والرموز المعقدة
-def download_youtube_audio(url, user_id):
-    unique_id = f"{user_id}_{int(time.time())}_{random.randint(100, 999)}"
-    output_template = os.path.join(BASE_DIR, f'audio_{unique_id}.%(ext)s')
-    final_mp3_path = os.path.join(BASE_DIR, f'audio_{unique_id}.mp3')
+# --- إعداد بوت التليجرام ---
+bot = TelegramClient('yt_downloader_bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+
+# تخزين مؤقت لروابط المستخدمين لتحديد نوع التحميل لاحقاً
+user_steps = {}
+
+@bot.on(events.NewMessage(pattern='/start'))
+async def start_handler(event):
+    sender = await event.get_sender()
+    welcome_msg = (
+        f"🙋‍♂️ أهلاً بك يا {sender.first_name} في بوت تحميل يوتيوب.\n\n"
+        "🔗 أرسل لي رابط الفيديو من اليوتيوب الآن لكي أقوم بتحميله لك.\n\n"
+        f"👨‍💻 مبرمج البوت: {DEVELOPER_USERNAME}"
+    )
+    await event.respond(welcome_msg)
+
+@bot.on(events.NewMessage)
+async def link_handler(event):
+    # تجاهل الأوامر مثل /start
+    if event.text.startswith('/'):
+        return
+        
+    url = event.text.strip()
     
-    ydl_ops = get_ydl_options(output_template)
-    ydl_ops.update({
-        'format': 'bestaudio/best',
-        'writethumbnail': True, 
-        'postprocessors': [
-            {'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'},
-            {'key': 'EmbedThumbnail'}, 
-            {'key': 'FFmpegMetadata', 'add_metadata': True}
-        ],
-        'postprocessor_args': [
-            '-metadata', 'comment=', '-metadata', 'description=', 
-            '-metadata', 'genre=', '-metadata', 'album='
-        ],
-    })
-    
-    if os.path.exists(COOKIES_PATH):
-        ydl_ops['cookiefile'] = COOKIES_PATH
+    # التحقق من أن الرابط ينتمي لليوتيوب
+    if "youtube.com" in url or "youtu.be" in url:
+        user_id = event.sender_id
+        user_steps[user_id] = url
         
-    with yt_dlp.YoutubeDL(ydl_ops) as ydl:
-        info = ydl.extract_info(url, download=True)
-        title = info.get('title', 'Audio')
-        
-        if os.path.exists(final_mp3_path):
-            return final_mp3_path, title
-        else:
-            for file in os.listdir(BASE_DIR):
-                if file.startswith(f'audio_{unique_id}') and file.endswith('.mp3'):
-                    return os.path.join(BASE_DIR, file), title
-            raise FileNotFoundError("تعذر العثور على ملف الـ MP3 الذي تم إنشاؤه.")
-
-# دالة تنزيل الفيديو من الرابط المباشر مع تجنب مشاكل الأسماء العربية والرموز المعقدة
-def download_youtube_video(url, user_id):
-    unique_id = f"{user_id}_{int(time.time())}_{random.randint(100, 999)}"
-    output_template = os.path.join(BASE_DIR, f'video_{unique_id}.%(ext)s')
-    final_mp4_path = os.path.join(BASE_DIR, f'video_{unique_id}.mp4')
-    
-    ydl_ops = get_ydl_options(output_template)
-    ydl_ops.update({'format': 'best/bestvideo+bestaudio'})
-    
-    if os.path.exists(COOKIES_PATH):
-        ydl_ops['cookiefile'] = COOKIES_PATH
-        
-    with yt_dlp.YoutubeDL(ydl_ops) as ydl:
-        info = ydl.extract_info(url, download=True)
-        title = info.get('title', 'Video')
-        
-        if os.path.exists(final_mp4_path):
-            return final_mp4_path, title
-        else:
-            for file in os.listdir(BASE_DIR):
-                if file.startswith(f'video_{unique_id}') and file.endswith('.mp4'):
-                    return os.path.join(BASE_DIR, file), title
-            raise FileNotFoundError("تعذر العثور على ملف الـ MP4 الذي تم إنشاؤه.")
-
-# دالة البحث في جوجل
-def google_search(query):
-    links = []
-    for result in search(query, num_results=4, lang='ar'):
-        links.append(result)
-    return links
-
-# دالة البحث في جوجل بلاي
-def google_play_search(query):
-    links = []
-    for result in search(query + " site:play.google.com", num_results=4, lang='ar'):
-        links.append(result)
-    return links
-
-# دالة البحث في يوتيوب
-def youtube_search(query):
-    links = []
-    ydl_opts = {'format': 'best', 'quiet': True, 'user_agent': 'Mozilla/5.0'}
-    
-    if os.path.exists(COOKIES_PATH):
-        ydl_opts['cookiefile'] = COOKIES_PATH
-        
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        result = ydl.extract_info(f"ytsearch:{query}", download=False)
-        for entry in result['entries']:
-            links.append(entry['url'])
-    return links
-
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    markup = types.InlineKeyboardMarkup()
-    item_google = types.InlineKeyboardButton("- بحث في جوجل", callback_data="google_search")
-    item_youtube = types.InlineKeyboardButton("- بحث في اليوتيوب", callback_data="youtube_search")
-    item_google_play = types.InlineKeyboardButton("- بحث في جوجل بلي", callback_data="google_play_search")
-    markup.add(item_google, item_youtube)
-    markup.add(item_google_play)
-    item_channel = types.InlineKeyboardButton("- قناة السورس 🧑🏻‍💻", url=f"https://t.me/{SOURCE_CHANNEL.replace('@','')}")
-    markup.add(item_channel)
-    bot.reply_to(message,'*- مرحباً بك عزيزي 🙋🏻‍♂️\n\n• يمكنك من خلال هذا البوت البحث عن ما تريده باستخدام الاقسام في الاسفل 🔥\nكل ما عليك هو اختيار القسم الذي تريد البحث فية وأرسل الكلمة للبحث عنها وسيتم إرسال النتائج اليك ✅ .\n\n• أو يمكنك إرسال رابط يوتيوب مباشر ليتم تحميله فوراً! 📥*', reply_markup=markup, parse_mode='Markdown')
-
-# لوحة تحكم المطور
-@bot.message_handler(commands=['admin'])
-def admin_panel(message):
-    if message.from_user.id == DEVELOPER_ID:
-        markup = types.InlineKeyboardMarkup()
-        item_channel = types.InlineKeyboardButton("قناة السورس 📊", url=f"https://t.me/{SOURCE_CHANNEL.replace('@','')}")
-        markup.add(item_channel)
-        
-        admin_text = (
-            f"⚙️ *لوحة تحكم المطور الرئيسية*\n\n"
-            f"• أهلاً بك يا مطورنا المتألق {DEVELOPER_USER}\n"
-            f"• معرف المطور: `{DEVELOPER_ID}`\n"
-            f"• حالة الاتصال بالسيرفر: ممتازة وعاملة 🚀"
-        )
-        bot.reply_to(message, admin_text, reply_markup=markup, parse_mode='Markdown')
+        # إنشاء أزرار الخيارات (فيديو أو ملف صوتي)
+        buttons = [
+            [
+                Button.inline("🎥 تحميل كفيديو (MP4)", data=f"video_{user_id}"),
+                Button.inline("🎵 تحميل كملف صوتي (MP3)", data=f"audio_{user_id}")
+            ]
+        ]
+        await event.respond("⚙️ اختر صيغة التحميل المناسبة لك:", buttons=buttons)
     else:
-        bot.reply_to(message, "⚠️ هذا الأمر مخصص للمطور فقط!")
-
-# ميزة استقبال الروابط المباشرة وعرض قائمة اختيار الصيغة (صوت / فيديو)
-@bot.message_handler(regexp=r"(?:https?:\/\/)?(?:www\.)?(?:youtube\.com|youtu\.be)\/\S+")
-def handle_youtube_link(message):
-    url = message.text
-    user_id = message.from_user.id
-    user_download_requests[user_id] = url
-    
-    markup = types.InlineKeyboardMarkup()
-    btn_audio = types.InlineKeyboardButton("🎵 تحميل كملف صوتي", callback_data="download_as_audio")
-    btn_video = types.InlineKeyboardButton("🎥 تحميل كفيديو", callback_data="download_as_video")
-    btn_channel = types.InlineKeyboardButton("🧑🏻‍💻 قناة السورس", url=f"https://t.me/{SOURCE_CHANNEL.replace('@','')}")
-    
-    markup.add(btn_audio, btn_video)
-    markup.add(btn_channel)
-    
-    bot.reply_to(message, "⚙️ *اختر الصيغة التي تود تحميل الملف بها:*", reply_markup=markup, parse_mode='Markdown')
-
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callback_query(call):
-    user_id = call.from_user.id
-    
-    if call.data == "google_search":
-        bot.send_message(call.message.chat.id, '*- أرسل كلمة البحث في Google:*', parse_mode='Markdown')
-        bot.register_next_step_handler(call.message, search_in_google)
-        
-    elif call.data == "youtube_search":
-        bot.send_message(call.message.chat.id, '*- أرسل كلمة البحث في YouTube:*', parse_mode='Markdown')
-        bot.register_next_step_handler(call.message, search_in_youtube)
-        
-    elif call.data == "google_play_search":
-        bot.send_message(call.message.chat.id, '*- أرسل كلمة البحث في Google Play:*', parse_mode='Markdown')
-        bot.register_next_step_handler(call.message, search_in_google_play)
-        
-    elif call.data == "download_as_audio":
-        if user_id in user_download_requests:
-            url = user_download_requests[user_id]
-            del user_download_requests[user_id]
-            
-            wait_msg = bot.send_message(call.message.chat.id, "⏳ *جاري بدء عملية معالجة الصوت...*", parse_mode='Markdown')
-            
-            from threading import Event
-            stop_anim = Event()
-            from threading import Thread
-            anim_thread = Thread(target=animate_loading, args=(call.message.chat.id, wait_msg.message_id, "جاري تحميل ومعالجة الملف الصوتي وبناء الغلاف", stop_anim))
-            anim_thread.start()
-            
-            try:
-                file_path, title = download_youtube_audio(url, user_id)
-                stop_anim.set()
-                anim_thread.join()
-                
-                bot.send_chat_action(call.message.chat.id, 'upload_document')
-                with open(file_path, 'rb') as audio:
-                    bot.send_audio(call.message.chat.id, audio, caption=f"🎵 {title}\n\nDeveloper: {DEVELOPER_USER}\nSource: {SOURCE_CHANNEL}")
-                
-                bot.delete_message(call.message.chat.id, wait_msg.message_id)
-                if os.path.exists(file_path): os.remove(file_path)
-                    
-            except Exception as e:
-                stop_anim.set()
-                bot.send_message(call.message.chat.id, f"❌ حدث خطأ أثناء تحميل الصوت: {e}\n\n💡 تأكد من تحديث yt-dlp واستخدام وكيل (User-Agent) صحيح.")
+        # إذا لم يكن الرابط من اليوتيوب، يطلب رابط صحيح (إلا إذا كان المطور يرسل شيئاً آخر)
+        if event.sender_id == DEVELOPER_ID:
+            pass
         else:
-            bot.send_message(call.message.chat.id, "⚠️ انتهت صلاحية هذا الطلب، الرجاء إرسال الرابط مجدداً.")
-            
-    elif call.data == "download_as_video":
-        if user_id in user_download_requests:
-            url = user_download_requests[user_id]
-            del user_download_requests[user_id]
-            
-            wait_msg = bot.send_message(call.message.chat.id, "⏳ *جاري بدء عملية معالجة الفيديو...*", parse_mode='Markdown')
-            
-            from threading import Event
-            stop_anim = Event()
-            from threading import Thread
-            anim_thread = Thread(target=animate_loading, args=(call.message.chat.id, wait_msg.message_id, "جاري تحميل ومعالجة مقطع الفيديو الآن", stop_anim))
-            anim_thread.start()
-            
-            try:
-                file_path, title = download_youtube_video(url, user_id)
-                stop_anim.set()
-                anim_thread.join()
-                
-                bot.send_chat_action(call.message.chat.id, 'upload_video')
-                with open(file_path, 'rb') as video:
-                    bot.send_video(call.message.chat.id, video, caption=f"🎥 {title}\n\nDeveloper: {DEVELOPER_USER}\nSource: {SOURCE_CHANNEL}")
-                
-                bot.delete_message(call.message.chat.id, wait_msg.message_id)
-                if os.path.exists(file_path): os.remove(file_path)
-                    
-            except Exception as e:
-                stop_anim.set()
-                bot.send_message(call.message.chat.id, f"❌ حدث خطأ أثناء تحميل الفيديو: {e}")
-        else:
-            bot.send_message(call.message.chat.id, "⚠️ انتهت صلاحية هذا الطلب، الرجاء إرسال الرابط مجدداً.")
+            await event.respond("❌ عذراً، هذا الرابط غير مدعوم. يرجى إرسال رابط فيديو يوتيوب صحيح.")
 
-def search_in_google(message):
-    user_input = message.text
-    search_msg = bot.send_message(message.chat.id, '*- جاري البحث... 🔍*', parse_mode='Markdown')
-    search_results = google_search(user_input)
-    bot.delete_message(message.chat.id, search_msg.message_id)
-    for link in search_results: bot.send_message(message.chat.id, link)
-
-def search_in_google_play(message):
-    user_input = message.text
-    search_msg = bot.send_message(message.chat.id, '*- جاري البحث... 🔍*', parse_mode='Markdown')
-    search_results = google_play_search(user_input)
-    bot.delete_message(message.chat.id, search_msg.message_id)
-    for link in search_results: bot.send_message(message.chat.id, link)
-
-def search_in_youtube(message):
-    user_input = message.text
-    search_msg = bot.send_message(message.chat.id, '*- جاري البحث... 🔍*', parse_mode='Markdown')
-    search_results = youtube_search(user_input)
-    bot.delete_message(message.chat.id, search_msg.message_id)
-    for link in search_results: bot.send_message(message.chat.id, link)
-
-# تشغيل البوت بنظام الـ Polling المباشر واللانهائي في الـ Main Thread
-if __name__ == "__main__":
-    # تشغيل السيرفر المساعد أولاً لإبقاء الحاوية متصلة وحية بالمنصة
-    keep_alive()
+@bot.on(events.CallbackQuery)
+async def callback_handler(event):
+    data = event.data.decode('utf-8')
+    user_id = event.sender_id
     
-    while True:
+    if data.startswith("video_") or data.startswith("audio_"):
+        target_user_id = int(data.split("_")[1])
+        
+        # التأكد من أن الذي ضغط على الزر هو صاحب الرابط
+        if user_id != target_user_id:
+            await event.answer("⚠️ هذه الأزرار ليست لك!", alert=True)
+            return
+            
+        action = data.split("_")[0]
+        url = user_steps.get(user_id)
+        
+        if not url:
+            await event.edit("❌ انتهت صلاحية الجلسة، يرجى إرسال الرابط مجدداً.")
+            return
+            
+        await event.edit("⏳ جاري معالجة الرابط وبدء التحميل، يرجى الانتظار...")
+        
+        # إعدادات yt-dlp المشتركة ونظام الكوكيز
+        ydl_opts = {
+            'cookiefile': COOKIES_FILE,
+            'outtmpl': f'downloads/{user_id}_%(id)s.%(ext)s',
+            'quiet': True,
+            'no_warnings': True
+        }
+        
+        if action == "video":
+            # تحميل فيديو بصيغة mp4 مدمجة الصوت والصورة بجودة مناسبة للتليجرام
+            ydl_opts['format'] = 'best[ext=mp4]/best'
+        elif action == "audio":
+            # تحميل كملف صوتي عالي الجودة وتحويله إلى mp3
+            ydl_opts['format'] = 'bestaudio/best'
+            ydl_opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }]
+            
         try:
-            bot.infinity_polling()
+            # إنشاء مجلد التحميلات إذا لم يكن موجوداً
+            if not os.path.exists('downloads'):
+                os.makedirs('downloads')
+                
+            # تشغيل التحميل في سياق منفصل لتجنب بلوك البوت
+            loop = asyncio.get_event_loop()
+            info = await loop.run_in_executor(None, lambda: download_media(url, ydl_opts))
+            
+            file_path = info['file_path']
+            title = info.get('title', 'YouTube Media')
+            
+            await event.respond(f"📥 جاري رفع الملف الآن: **{title}**")
+            
+            # إرسال الملف بناءً على الخيار المحدد
+            if action == "video":
+                await bot.send_file(event.chat_id, file_path, caption=f"🎬 **{title}**\n\nتم التحميل بواسطة البوت الخاص بك.")
+            elif action == "audio":
+                await bot.send_file(event.chat_id, file_path, caption=f"🎵 **{title}**\n\nتم التحميل بواسطة البوت الخاص بك.", voice_note=False)
+                
+            # حذف الملف محلياً بعد الإرسال لتوفير المساحة
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                
+            # تنظيف الذاكرة المؤقتة للمستخدم
+            if user_id in user_steps:
+                del user_steps[user_id]
+                
         except Exception as e:
-            time.sleep(5)
+            await event.respond(f"❌ حدث خطأ أثناء التحميل أو الرفع.\nالسبب: {str(e)}")
+            if user_id in user_steps:
+                del user_steps[user_id]
+
+def download_media(url, opts):
+    with YoutubeDL(opts) as ydl:
+        info_dict = ydl.extract_info(url, download=True)
+        filename = ydl.prepare_filename(info_dict)
+        
+        # إذا تم تحويل الصوت إلى mp3، فإن الامتداد في prepare_filename قد يختلف، لذا نقوم بتعديله
+        if 'postprocessors' in opts:
+            filename = os.path.splitext(filename)[0] + '.mp3'
+            
+        info_dict['file_path'] = filename
+        return info_dict
+
+# --- تشغيل التطبيق بالكامل ---
+if __name__ == '__main__':
+    print("⚡ جاري تشغيل سيرفر الويب المدمج على البورت 8080...")
+    flask_thread = Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+    
+    print("🤖 البوت يعمل الآن بنجاح ومستعد لاستقبال الروابط...")
+    bot.run_until_disconnected()
