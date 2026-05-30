@@ -3,4 +3,4 @@ runtime: python
 commands:
   - name: web
     runner: python
-    entrypoint: bot.py
+    entrypoint: uvicorn bot:app --host 0.0.0.0 --port 7860
