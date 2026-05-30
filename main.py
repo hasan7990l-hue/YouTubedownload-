@@ -3,8 +3,6 @@ from googlesearch import search
 import yt_dlp
 from telebot import types
 import os
-from flask import Flask
-from threading import Thread
 import time
 import random
 import shutil 
@@ -19,7 +17,7 @@ API_HASH = "544459a0701b32741254945b08daebfe"
 DEVELOPER_USER = "@Eror_7"
 SOURCE_CHANNEL = "@lb2_c"
 
-# تحديد المسار المطلق والكامل لملف الكوكيز لضمان العثور عليه في بيئة Hugging Face السحابية أو Replit
+# تحديد المسار المطلق والكامل لملف الكوكيز لضمان العثور عليه في بيئة العمل السحابية
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIES_PATH = os.path.join(BASE_DIR, 'cookies.txt')
 
@@ -39,25 +37,6 @@ def get_ydl_options(output_template):
         'ignoreerrors': False,
         'ffmpeg_location': '/home/runner/.nix-profile/bin',
     }
-
-# ----- إعداد الويب الصغير لمنع إيقاف البوت -----
-flask_app = Flask(__name__)
-# تعريف المتغير العالمي app المطلوب رسمياً من خوادم Uvicorn / Gunicorn للتعرف على التطبيق
-app = flask_app
-
-@flask_app.route('/')
-def home():
-    return "البوت يعمل بنجاح وبدون توقف! 🚀"
-
-def run_web_server():
-    # تم تثبيت المنفذ هنا إلى 7860 ليتطابق مع نظام الاستضافة
-    flask_app.run(host='0.0.0.0', port=7860, use_reloader=False)
-
-def keep_alive():
-    t = Thread(target=run_web_server)
-    t.daemon = True
-    t.start()
-# ----------------------------------------------
 
 # دالة لتحديث الرسائل المتحركة أثناء التحميل
 def animate_loading(chat_id, message_id, base_text, stop_event):
@@ -183,8 +162,7 @@ def admin_panel(message):
             f"⚙️ *لوحة تحكم المطور الرئيسية*\n\n"
             f"• أهلاً بك يا مطورنا المتألق {DEVELOPER_USER}\n"
             f"• معرف المطور: `{DEVELOPER_ID}`\n"
-            f"• حالة الاتصال بالسيرفر: ممتازة وعاملة 🚀\n"
-            f"• حالة الـ Web Server: متصل على منفذ 7860 ✅"
+            f"• حالة الاتصال بالسيرفر: ممتازة وعاملة 🚀"
         )
         bot.reply_to(message, admin_text, reply_markup=markup, parse_mode='Markdown')
     else:
@@ -232,6 +210,7 @@ def handle_callback_query(call):
             
             from threading import Event
             stop_anim = Event()
+            from threading import Thread
             anim_thread = Thread(target=animate_loading, args=(call.message.chat.id, wait_msg.message_id, "جاري تحميل ومعالجة الملف الصوتي وبناء الغلاف", stop_anim))
             anim_thread.start()
             
@@ -262,6 +241,7 @@ def handle_callback_query(call):
             
             from threading import Event
             stop_anim = Event()
+            from threading import Thread
             anim_thread = Thread(target=animate_loading, args=(call.message.chat.id, wait_msg.message_id, "جاري تحميل ومعالجة مقطع الفيديو الآن", stop_anim))
             anim_thread.start()
             
@@ -304,20 +284,10 @@ def search_in_youtube(message):
     bot.delete_message(message.chat.id, search_msg.message_id)
     for link in search_results: bot.send_message(message.chat.id, link)
 
-def run_bot_polling():
-    while True:
-        try: bot.polling(none_stop=True, timeout=90, long_polling_timeout=90)
-        except Exception: time.sleep(5)
-
-def start_search_bot():
-    # تشغيل البوت في الخلفية أولاً، لكي لا يتم حظر الـ Main Thread الخاص بالسيرفر
-    t_bot = Thread(target=run_bot_polling)
-    t_bot.daemon = True
-    t_bot.start()
-
-# استدعاء دالة تشغيل البوت
-start_search_bot()
-
-# تشغيل خادم ويب Flask في الـ Main Thread الأساسي للسيرفر، ليظل متصلاً وتتعرف عليه الاستضافة مباشرة
+# تشغيل البوت بنظام الـ Polling المباشر واللانهائي في الـ Main Thread
 if __name__ == "__main__":
-    run_web_server()
+    while True:
+        try: 
+            bot.polling(none_stop=True, timeout=90, long_polling_timeout=90)
+        except Exception: 
+            time.sleep(5)
