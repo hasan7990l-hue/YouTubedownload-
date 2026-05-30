@@ -13,5 +13,8 @@ RUN python -m pip install --no-cache-dir --upgrade pip && \
 
 COPY . .
 
+# فتح منفذ وهمي (Port 8000) حتى تقبله منصة Back4App وميفشل النشر
+EXPOSE 8000
+
 # تشغيل البوت باستخدام ملف app.py
 CMD ["python", "app.py"]
