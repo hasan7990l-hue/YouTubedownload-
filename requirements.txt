@@ -1,3 +1,4 @@
 pyTelegramBotAPI
+googlesearch-python
 yt-dlp
-ffmpeg
+Flask
