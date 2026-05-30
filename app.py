@@ -77,7 +77,7 @@ def download_youtube_audio(url, user_id):
     
     ydl_ops = get_ydl_options(output_template)
     ydl_ops.update({
-        'format': 'bestaudio/best or ba/b',
+        'format': 'bestaudio/best|ba/b',
         'writethumbnail': True, 
         'postprocessors': [
             {'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'},
