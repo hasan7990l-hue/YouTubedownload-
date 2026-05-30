@@ -1,4 +1,4 @@
-pyTelegramBotAPI
-googlesearch-python
+flask
+nest_asyncio
+telethon
 yt-dlp
-Flask
