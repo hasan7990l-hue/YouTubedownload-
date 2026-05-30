@@ -308,4 +308,8 @@ if __name__ == "__main__":
     # تشغيل السيرفر المساعد أولاً لإبقاء الحاوية متصلة وحية بالمنصة
     keep_alive()
     
-    while True
+    while True:
+        try:
+            bot.infinity_polling()
+        except Exception as e:
+            time.sleep(5)
