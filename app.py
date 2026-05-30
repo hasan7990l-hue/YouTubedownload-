@@ -51,7 +51,9 @@ def home():
     """
 
 def run_flask():
-    app.run(host='0.0.0.0', port=8080)
+    # هنا تم جعل البورت يقرأ من إعدادات المنصة (مثل بورت 5000 المطلوب في الصورة) وإذا لم يجدها يستخدم 8080 الافتراضي الخاص بك
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
 
 # --- إعداد بوت التليجرام ---
 bot = TelegramClient('yt_downloader_bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
@@ -186,7 +188,7 @@ def download_media(url, opts):
 
 # --- تشغيل التطبيق بالكامل ---
 if __name__ == '__main__':
-    print("⚡ جاري تشغيل سيرفر الويب المدمج على البورت 8080...")
+    print("⚡ جاري تشغيل سيرفر الويب المدمج...")
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
