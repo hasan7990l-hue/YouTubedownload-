@@ -50,10 +50,11 @@ def get_ydl_options(output_template):
         'quiet': True,
         'no_warnings': True,
         'outtmpl': output_template,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'nocheckcertificate': True,
         'ignoreerrors': False,
         'ffmpeg_location': '/home/runner/.nix-profile/bin',
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
     }
 
 # دالة لتحديث الرسائل المتحركة أثناء التحميل
@@ -77,7 +78,7 @@ def download_youtube_audio(url, user_id):
     
     ydl_ops = get_ydl_options(output_template)
     ydl_ops.update({
-        'format': 'bestaudio/best|ba/b',
+        'format': 'bestaudio/best',
         'writethumbnail': True, 
         'postprocessors': [
             {'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'},
@@ -112,7 +113,7 @@ def download_youtube_video(url, user_id):
     final_mp4_path = os.path.join(BASE_DIR, f'video_{unique_id}.mp4')
     
     ydl_ops = get_ydl_options(output_template)
-    ydl_ops.update({'format': 'best[ext=mp4]/best'})
+    ydl_ops.update({'format': 'best/bestvideo+bestaudio'})
     
     if os.path.exists(COOKIES_PATH):
         ydl_ops['cookiefile'] = COOKIES_PATH
