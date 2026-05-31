@@ -130,8 +130,8 @@ async def callback_handler(event):
         }
         
         if action == "video":
-            # تم تحديث الصيغة هنا لجلب أفضل فيديو + أفضل صوت ودمجهما تلقائياً لتفادي مشكلة الصيغ غير المتوفرة
-            ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+            # تم تحسين السطر بالأسفل ليقوم بجلب أفضل جودة فيديو + أفضل صوت كخيار أول، وإذا فشل يجلب أفضل ملف مدمج جاهز لتفادي خطأ الصيغ تماماً
+            ydl_opts['format'] = 'bestvideo+bestaudio/best'
         elif action == "audio":
             # جلب أفضل صوت متاح بصيغة عامة ثم تحويله
             ydl_opts['format'] = 'bestaudio/best'
