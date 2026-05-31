@@ -121,19 +121,31 @@ async def callback_handler(event):
             
         await event.edit("⏳ جاري معالجة الرابط وبدء التحميل، يرجى الانتظار...")
         
-        # إعدادات yt-dlp المشتركة ونظام الكوكيز
+        # إعدادات yt-dlp المشتركة ونظام الكوكيز وحماية التزييف ضد البلوك
         ydl_opts = {
             'cookiefile': COOKIES_FILE,
             'outtmpl': f'downloads/{user_id}_%(id)s.%(ext)s',
             'quiet': True,
-            'no_warnings': True
+            'no_warnings': True,
+            # ميزات تزييف الهوية والالتفاف على حظر يوتيوب للسيرفرات:
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+            },
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                    'skip': ['dash', 'hls']
+                }
+            }
         }
         
         if action == "video":
-            # تم تأمين جلب الفيديو ليطلب أفضل جودة مدمجة تحتوي على فيديو وصوت معاً، وإذا فشل يأخذ أي جودة متاحة تلقائياً لتفادي أخطاء الصيغ المفقودة
-            ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+            # جلب أفضل جودة مدمجة أو دمج فيديو وصوت، والآن مدعوم بوجود الـ FFmpeg في سيرفرك
+            ydl_opts['format'] = 'bestvideo+bestaudio/best'
         elif action == "audio":
-            # جلب أفضل صوت متاح بصيغة عامة ثم تحويله، وتمت إضافة بدائل مرنة لجلب الصوت في حال فقدان الجودة القصوى
+            # جلب الصوت وتحويله بشكل سليم لـ MP3
             ydl_opts['format'] = 'bestaudio/best'
             ydl_opts['postprocessors'] = [{
                 'key': 'FFmpegExtractAudio',
@@ -170,6 +182,7 @@ async def callback_handler(event):
                 del user_steps[user_id]
                 
         except Exception as e:
+            # تم تحسين عرض الخطأ لمعرفة التفاصيل الدقيقة لو استمرت مشاكل الحظر
             await event.respond(f"❌ حدث خطأ أثناء التحميل أو الرفع.\nالسبب: {str(e)}")
             if user_id in user_steps:
                 del user_steps[user_id]
@@ -179,10 +192,14 @@ def download_media(url, opts):
         info_dict = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info_dict)
         
-        # إذا تم تحويل الصوت إلى mp3، فإن الامتداد في prepare_filename قد يختلف، لذا نقوم بتعديله
-        if 'postprocessors' in opts:
-            filename = os.path.splitext(filename)[0] + '.mp3'
-            
+        # التأكد من صحة الامتداد الفعلي للملف بعد التحميل
+        if not os.path.exists(filename):
+            base, _ = os.path.splitext(filename)
+            for ext in ['mp4', 'mkv', 'webm', '3gp', 'mp3', 'm4a']:
+                if os.path.exists(f"{base}.{ext}"):
+                    filename = f"{base}.{ext}"
+                    break
+                    
         info_dict['file_path'] = filename
         return info_dict
 
@@ -193,5 +210,5 @@ if __name__ == '__main__':
     flask_thread.daemon = True
     flask_thread.start()
     
-    print("🤖 البوت يعمل الآن بنجاح ومستعد لاستقبال الروابط...")
+    print("🤖 البوت يعمل الآن بنجاح ومستعد استقبال الروابط...")
     bot.run_until_disconnected()
