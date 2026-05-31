@@ -121,31 +121,32 @@ async def callback_handler(event):
             
         await event.edit("⏳ جاري معالجة الرابط وبدء التحميل، يرجى الانتظار...")
         
-        # إعدادات yt-dlp المشتركة ونظام الكوكيز وحماية التزييف ضد البلوك
+        # إعدادات متقدمة جداً مدمجة بملف الكوكيز لتخطي الحظر الجغرافي وحظر الخوادم الصارم
         ydl_opts = {
             'cookiefile': COOKIES_FILE,
             'outtmpl': f'downloads/{user_id}_%(id)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
-            # ميزات تزييف الهوية والالتفاف على حظر يوتيوب للسيرفرات:
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.5',
+                'Referer': 'https://www.youtube.com/',
             },
+            # إعدادات الاستخراج المحدثة لعام 2026 لمحاكاة أجهزة آيفون ومشغل الويب المدمج لربط الكوكيز بسلاسة
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'web'],
+                    'player_client': ['ios', 'web_embedded', 'android'],
                     'skip': ['dash', 'hls']
                 }
             }
         }
         
         if action == "video":
-            # جلب أفضل جودة مدمجة أو دمج فيديو وصوت، والآن مدعوم بوجود الـ FFmpeg في سيرفرك
+            # دمج الفيديو بالصوت عن طريق FFmpeg المتوفر الآن بالسيرفر
             ydl_opts['format'] = 'bestvideo+bestaudio/best'
         elif action == "audio":
-            # جلب الصوت وتحويله بشكل سليم لـ MP3
+            # استخراج الصوت بدقة عالية
             ydl_opts['format'] = 'bestaudio/best'
             ydl_opts['postprocessors'] = [{
                 'key': 'FFmpegExtractAudio',
@@ -182,7 +183,6 @@ async def callback_handler(event):
                 del user_steps[user_id]
                 
         except Exception as e:
-            # تم تحسين عرض الخطأ لمعرفة التفاصيل الدقيقة لو استمرت مشاكل الحظر
             await event.respond(f"❌ حدث خطأ أثناء التحميل أو الرفع.\nالسبب: {str(e)}")
             if user_id in user_steps:
                 del user_steps[user_id]
@@ -210,5 +210,5 @@ if __name__ == '__main__':
     flask_thread.daemon = True
     flask_thread.start()
     
-    print("🤖 البوت يعمل الآن بنجاح ومستعد استقبال الروابط...")
+    print("🤖 البوت يعمل الآن بنجاح ومستعد لاستقبال الروابط...")
     bot.run_until_disconnected()
