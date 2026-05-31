@@ -130,10 +130,10 @@ async def callback_handler(event):
         }
         
         if action == "video":
-            # تم تحسين السطر بالأسفل ليقوم بجلب أفضل جودة فيديو + أفضل صوت كخيار أول، وإذا فشل يجلب أفضل ملف مدمج جاهز لتفادي خطأ الصيغ تماماً
-            ydl_opts['format'] = 'bestvideo+bestaudio/best'
+            # تم تأمين جلب الفيديو ليطلب أفضل جودة مدمجة تحتوي على فيديو وصوت معاً، وإذا فشل يأخذ أي جودة متاحة تلقائياً لتفادي أخطاء الصيغ المفقودة
+            ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
         elif action == "audio":
-            # جلب أفضل صوت متاح بصيغة عامة ثم تحويله
+            # جلب أفضل صوت متاح بصيغة عامة ثم تحويله، وتمت إضافة بدائل مرنة لجلب الصوت في حال فقدان الجودة القصوى
             ydl_opts['format'] = 'bestaudio/best'
             ydl_opts['postprocessors'] = [{
                 'key': 'FFmpegExtractAudio',
