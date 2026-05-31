@@ -51,8 +51,8 @@ def home():
     """
 
 def run_flask():
-    # هنا تم جعل البورت يقرأ من إعدادات المنصة (مثل بورت 5000 المطلوب في الصورة) وإذا لم يجدها يستخدم 8080 الافتراضي الخاص بك
-    port = int(os.environ.get("PORT", 8080))
+    # هنا تم جعل البورت يقرأ من إعدادات المنصة (مثل بورت 5000 المطلوب في الصورة) وإذا لم يجدها يستخدم 5000 الافتراضي لـ Back4App
+    port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
 
 # --- إعداد بوت التليجرام ---
@@ -130,10 +130,10 @@ async def callback_handler(event):
         }
         
         if action == "video":
-            # تحميل فيديو بصيغة mp4 مدمجة الصوت والصورة بجودة مناسبة للتليجرام
-            ydl_opts['format'] = 'best[ext=mp4]/best'
+            # تم تحديث الصيغة هنا لجلب أفضل فيديو + أفضل صوت ودمجهما تلقائياً لتفادي مشكلة الصيغ غير المتوفرة
+            ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
         elif action == "audio":
-            # تحميل كملف صوتي عالي الجودة وتحويله إلى mp3
+            # جلب أفضل صوت متاح بصيغة عامة ثم تحويله
             ydl_opts['format'] = 'bestaudio/best'
             ydl_opts['postprocessors'] = [{
                 'key': 'FFmpegExtractAudio',
