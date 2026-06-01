@@ -114,13 +114,15 @@ async def callback_handler(event):
             
         await event.edit("⏳ جاري معالجة الرابط وبدء التحميل، يرجى الانتظار...")
         
-        # إعدادات الالتفاف السحرية الجديدة مع إضافة البروكسي الألماني
+        # إعدادات الالتفاف مع البروكسي المحدث (209.141.46.220:9091)
         ydl_opts = {
-            'proxy': 'http://47.91.89.3:1111',
+            'proxy': 'http://209.141.46.220:9091',
             'cookiefile': COOKIES_FILE,
             'outtmpl': f'downloads/{user_id}_%(id)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
+            'socket_timeout': 30,
+            'retries': 5,
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
