@@ -12,7 +12,7 @@ nest_asyncio.apply()
 # --- بيانات المطور والبوت المقدمة ---
 API_ID = 27485469
 API_HASH = '544459a0701b32741254945b08daebfe'
-BOT_TOKEN = '8277082493:AAGpRt5OG4adspV_wDH52Pk9O8TolEXJYbU'
+BOT_TOKEN = '8277082493:AAEjNtAo4GroDkM0-mIFNLxhgLZ-53qalBg'
 DEVELOPER_ID = 8456056018
 DEVELOPER_USERNAME = '@Eror_7'
 
@@ -114,8 +114,9 @@ async def callback_handler(event):
             
         await event.edit("⏳ جاري معالجة الرابط وبدء التحميل، يرجى الانتظار...")
         
-        # إعدادات الالتفاف السحرية الجديدة لتخطي حظر الـ Bot Check تماماً
+        # إعدادات الالتفاف السحرية الجديدة مع إضافة البروكسي الألماني
         ydl_opts = {
+            'proxy': 'http://47.91.89.3:1111',
             'cookiefile': COOKIES_FILE,
             'outtmpl': f'downloads/{user_id}_%(id)s.%(ext)s',
             'quiet': True,
@@ -125,7 +126,6 @@ async def callback_handler(event):
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.5',
             },
-            # 🔥 التعديل الجذري الأقوى: استخدام مشغل أندرويد المطور ومحاكاة التلفزيون والأجهزة الذكية لتخطي البلوك
             'extractor_args': {
                 'youtube': {
                     'player_client': ['android_vr', 'tv', 'ios'],
@@ -136,7 +136,6 @@ async def callback_handler(event):
         }
         
         if action == "video":
-            # جلب الجودة بالاعتماد على الـ FFmpeg المثبت عبر الـ Dockerfile
             ydl_opts['format'] = 'bestvideo+bestaudio/best'
         elif action == "audio":
             ydl_opts['format'] = 'bestaudio/best'
@@ -170,7 +169,6 @@ async def callback_handler(event):
                 del user_steps[user_id]
                 
         except Exception as e:
-            # هنا قمت بتحسين استخراج رسالة الخطأ الصافية حتى تكون السجلات مريحة لك
             error_msg = str(e)
             await event.respond(f"❌ حدث خطأ أثناء التحميل أو الرفع.\nالسبب: {error_msg}")
             if user_id in user_steps:
