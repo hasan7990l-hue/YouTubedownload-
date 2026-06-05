@@ -1,5 +1,6 @@
 import os
 import asyncio
+import random
 from flask import Flask
 from threading import Thread
 import nest_asyncio
@@ -16,7 +17,15 @@ BOT_TOKEN = '8277082493:AAEjNtAo4GroDkM0-mIFNLxhgLZ-53qalBg'
 DEVELOPER_ID = 8456056018
 DEVELOPER_USERNAME = '@Eror_7'
 
-# --- إعداد ملف الكوكيز ---
+# --- قائمة متصفحات الموبايل الحديثة للتمويه (تغني عن الكوكيز والـ VPN) ---
+USER_AGENTS = [
+    "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Android 14; Mobile; rv:125.0) Gecko/125.0 Firefox/125.0"
+]
+
+# --- إعداد ملف الكوكيز (تم إبقاؤه لسلامة الكود ولكن معطل بالخلفية) ---
 COOKIES_FILE = 'cookies.txt'
 if not os.path.exists(COOKIES_FILE):
     with open(COOKIES_FILE, 'w', encoding='utf-8') as f:
@@ -114,31 +123,34 @@ async def callback_handler(event):
             
         await event.edit("⏳ جاري معالجة الرابط وبدء التحميل، يرجى الانتظار...")
         
-        # إعدادات الالتفاف مع البروكسي المحدث (209.141.46.220:9091)
+        # اختيار متصفح عشوائي لكل عملية لكسر حماية يوتيوب
+        chosen_ua = random.choice(USER_AGENTS)
+        
+        # إعدادات متطورة ومحدثة للعمل بدون كوكيز وبدون بروكسي/VPN
         ydl_opts = {
-            'proxy': 'http://209.141.46.220:9091',
-            'cookiefile': COOKIES_FILE,
             'outtmpl': f'downloads/{user_id}_%(id)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
             'socket_timeout': 30,
             'retries': 5,
+            'nocheckcertificate': True,
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'User-Agent': chosen_ua,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.5',
+                'Sec-Fetch-Mode': 'navigate',
             },
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android_vr', 'tv', 'ios'],
-                    'player_skip': ['web', 'android'],
+                    'player_client': ['android', 'ios'], # محاكاة تطبيقات الموبايل لتخطي الكوكيز
                     'skip': ['dash', 'hls']
                 }
             }
         }
         
         if action == "video":
-            ydl_opts['format'] = 'bestvideo+bestaudio/best'
+            # صيغة 'best' تجلب فيديو مدمج جاهز بطلب واحد لتقليل الضغط وتجنب حظر الـ IP
+            ydl_opts['format'] = 'best'
         elif action == "audio":
             ydl_opts['format'] = 'bestaudio/best'
             ydl_opts['postprocessors'] = [{
@@ -150,6 +162,9 @@ async def callback_handler(event):
         try:
             if not os.path.exists('downloads'):
                 os.makedirs('downloads')
+                
+            # تأخير عشوائي بسيط (من ثانية إلى 3 ثوانٍ) لمنع خوارزميات يوتيوب من رصد البوت
+            await asyncio.sleep(random.uniform(1.0, 3.0))
                 
             loop = asyncio.get_event_loop()
             info = await loop.run_in_executor(None, lambda: download_media(url, ydl_opts))
