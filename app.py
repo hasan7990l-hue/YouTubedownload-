@@ -107,6 +107,8 @@ async def link_handler(event):
         
         try:
             ydl_opts = get_base_ydl_opts()
+            ydl_opts['format'] = 'b'  # تحديد صيغة مرنة وبسيطة جداً للفحص الأولي لمنع خطأ الـ Format
+            
             loop = asyncio.get_event_loop()
             
             with YoutubeDL(ydl_opts) as ydl:
@@ -171,14 +173,9 @@ async def callback_handler(event):
         ydl_opts['outtmpl'] = f'downloads/{user_id}_%(id)s.%(ext)s'
         
         if quality_type == "best":
-            ydl_opts['format'] = 'best'  # سحب الفيديو الأصلي الجاهز بدون دمج خارجي لتجنب الخطأ
+            ydl_opts['format'] = 'best/bestvideo'  # اختيار أفضل جودة متوفرة تلقائياً ومدمجة الصوت
         elif quality_type == "audio":
-            ydl_opts['format'] = 'bestaudio/best'
-            ydl_opts['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }]
+            ydl_opts['format'] = 'bestaudio/best'  # سحب الصوت الأصلي مباشرة بدون تضارب صيغ
             
         try:
             if not os.path.exists('downloads'):
@@ -194,8 +191,9 @@ async def callback_handler(event):
             
             await event.respond(f"📥 جاري رفع الملف إلى تليجرام: **{title}**")
             
+            # إرسال كملف صوتي (موسيقى) إذا تم اختيار الصوت
             if quality_type == "audio":
-                await bot.send_file(event.chat_id, file_path, caption=f"🎵 **{title}**\n\nتم التحميل بنجاح.", voice_note=False)
+                await bot.send_file(event.chat_id, file_path, caption=f"🎵 **{title}**\n\nتم تحميل الملف الصوتي بنجاح.", voice_note=False)
             else:
                 await bot.send_file(event.chat_id, file_path, caption=f"🎬 **{title}**\n\nتم التحميل بالجودة الأصلية بنجاح.")
                 
