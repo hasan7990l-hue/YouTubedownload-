@@ -72,12 +72,19 @@ def get_base_ydl_opts():
         'socket_timeout': 30,
         'retries': 5,
         'nocheckcertificate': True,
-        'source_address': '0.0.0.0',  # إجبار السيرفر على استخدام IPv4 لكسر حظر يوتيوب
-        'geo_bypass': True,          # تخطي الحظر الجغرافي للسيرفرات
+        'source_address': '0.0.0.0',
+        'geo_bypass': True,
         'http_headers': {
             'User-Agent': chosen_ua,
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.5',
+        },
+        # الخيار السحري الأهم: محاكاة عملاء تطبيقات الموبايل الرسمية لليوتيوب لتخطي الحجب
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios'],
+                'skip': ['dash', 'hls']
+            }
         }
     }
     if os.path.exists(COOKIES_FILE):
