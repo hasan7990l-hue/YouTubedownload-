@@ -72,6 +72,8 @@ def get_base_ydl_opts():
         'socket_timeout': 30,
         'retries': 5,
         'nocheckcertificate': True,
+        'source_address': '0.0.0.0',  # إجبار السيرفر على استخدام IPv4 لكسر حظر يوتيوب
+        'geo_bypass': True,          # تخطي الحظر الجغرافي للسيرفرات
         'http_headers': {
             'User-Agent': chosen_ua,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -106,9 +108,7 @@ async def link_handler(event):
         status_msg = await event.respond("🔍 جاري جلب معلومات الفيديو والصورة المصغرة...")
         
         try:
-            # هنا شلنا تحديد الـ format تماماً عشان يقرأ معلومات أي فيديو بالكون بدون أخطاء
             ydl_opts = get_base_ydl_opts()
-            
             loop = asyncio.get_event_loop()
             
             with YoutubeDL(ydl_opts) as ydl:
@@ -140,7 +140,7 @@ async def link_handler(event):
                 pass
             error_msg = str(e)
             if "Sign in to confirm you" in error_msg:
-                await event.respond("❌ يوتيوب يطلب تسجيل الدخول. يرجى التأكد من ملف الـ `cookies.txt` الخاص بك.")
+                await event.respond("❌ يوتيوب يطلب تسجيل الدخول. يرجى التأكد من أن ملف الـ `cookies.txt` حديث وصالح ولم تنتهي صلاحيته.")
             else:
                 await event.respond(f"❌ فشل جلب معلومات الرابط.\nالسبب: {error_msg}")
     else:
@@ -173,10 +173,8 @@ async def callback_handler(event):
         ydl_opts['outtmpl'] = f'downloads/{user_id}_%(id)s.%(ext)s'
         
         if quality_type == "best":
-            # صيغة مرنة جداً تجلب أفضل فيديو مدمج بالصوت تلقائياً لتفادي مشاكل الـ format
-            ydl_opts['format'] = 'best/bestvideo+bestaudio'
+            ydl_opts['format'] = 'best'
         elif quality_type == "audio":
-            # جلب أفضل صوت متوفر مباشرة
             ydl_opts['format'] = 'bestaudio/best'
             
         try:
