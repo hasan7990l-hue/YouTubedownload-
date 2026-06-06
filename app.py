@@ -106,8 +106,8 @@ async def link_handler(event):
         status_msg = await event.respond("🔍 جاري جلب معلومات الفيديو والصورة المصغرة...")
         
         try:
+            # هنا شلنا تحديد الـ format تماماً عشان يقرأ معلومات أي فيديو بالكون بدون أخطاء
             ydl_opts = get_base_ydl_opts()
-            ydl_opts['format'] = 'b'  # تحديد صيغة مرنة وبسيطة جداً للفحص الأولي لمنع خطأ الـ Format
             
             loop = asyncio.get_event_loop()
             
@@ -154,7 +154,7 @@ async def callback_handler(event):
     
     if data.startswith("quality_"):
         parts = data.split("_")
-        quality_type = parts[1]  # best أو audio
+        quality_type = parts[1]
         target_user_id = int(parts[2])
         
         if user_id != target_user_id:
@@ -173,9 +173,11 @@ async def callback_handler(event):
         ydl_opts['outtmpl'] = f'downloads/{user_id}_%(id)s.%(ext)s'
         
         if quality_type == "best":
-            ydl_opts['format'] = 'best/bestvideo'  # اختيار أفضل جودة متوفرة تلقائياً ومدمجة الصوت
+            # صيغة مرنة جداً تجلب أفضل فيديو مدمج بالصوت تلقائياً لتفادي مشاكل الـ format
+            ydl_opts['format'] = 'best/bestvideo+bestaudio'
         elif quality_type == "audio":
-            ydl_opts['format'] = 'bestaudio/best'  # سحب الصوت الأصلي مباشرة بدون تضارب صيغ
+            # جلب أفضل صوت متوفر مباشرة
+            ydl_opts['format'] = 'bestaudio/best'
             
         try:
             if not os.path.exists('downloads'):
@@ -191,7 +193,6 @@ async def callback_handler(event):
             
             await event.respond(f"📥 جاري رفع الملف إلى تليجرام: **{title}**")
             
-            # إرسال كملف صوتي (موسيقى) إذا تم اختيار الصوت
             if quality_type == "audio":
                 await bot.send_file(event.chat_id, file_path, caption=f"🎵 **{title}**\n\nتم تحميل الملف الصوتي بنجاح.", voice_note=False)
             else:
