@@ -27,7 +27,7 @@ USER_AGENTS = [
     "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 ]
 
-# --- إعداد تطبيق Flask (الويب الصغير) ---
+# --- إعداد تطبيق Flask ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -64,12 +64,30 @@ bot = TelegramClient('yt_downloader_bot', API_ID, API_HASH).start(bot_token=BOT_
 
 user_steps = {}
 
+def get_base_ydl_opts():
+    chosen_ua = random.choice(USER_AGENTS)
+    opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'socket_timeout': 30,
+        'retries': 5,
+        'nocheckcertificate': True,
+        'http_headers': {
+            'User-Agent': chosen_ua,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+        }
+    }
+    if os.path.exists(COOKIES_FILE):
+        opts['cookiefile'] = COOKIES_FILE
+    return opts
+
 @bot.on(events.NewMessage(pattern='/start'))
 async def start_handler(event):
     sender = await event.get_sender()
     welcome_msg = (
-        f"🙋‍♂️ أهلاً بك يا {sender.first_name} في بوت تحميل يوتيوب.\n\n"
-        "🔗 أرسل لي رابط الفيديو من اليوتيوب الآن لكي أقوم بتحميله لك.\n\n"
+        f"🙋‍♂️ أهلاً بك يا {sender.first_name} في بوت تحميل يوتيوب المتطور.\n\n"
+        "🔗 أرسل لي رابط الفيديو من اليوتيوب الآن لكي أقوم بمعالجته وعرض الخيارات لك.\n\n"
         f"👨‍💻 مبرمج البوت: {DEVELOPER_USERNAME}"
     )
     await event.respond(welcome_msg)
@@ -85,13 +103,44 @@ async def link_handler(event):
         user_id = event.sender_id
         user_steps[user_id] = url
         
-        buttons = [
-            [
-                Button.inline("🎥 تحميل كفيديو (MP4)", data=f"video_{user_id}"),
-                Button.inline("🎵 تحميل كملف صوتي (MP3)", data=f"audio_{user_id}")
+        status_msg = await event.respond("🔍 جاري جلب معلومات الفيديو والصورة المصغرة...")
+        
+        try:
+            ydl_opts = get_base_ydl_opts()
+            loop = asyncio.get_event_loop()
+            
+            with YoutubeDL(ydl_opts) as ydl:
+                info = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=False))
+            
+            title = info.get('title', 'فيديو يوتيوب')
+            thumbnail = info.get('thumbnail', '')
+            
+            buttons = [
+                [
+                    Button.inline("🎥 تحميل بالفيديو الأصلي", data=f"quality_best_{user_id}"),
+                    Button.inline("🎵 تحميل كملف صوتي MP3", data=f"quality_audio_{user_id}")
+                ]
             ]
-        ]
-        await event.respond("⚙️ اختر صيغة التحميل المناسبة لك:", buttons=buttons)
+            
+            caption_text = f"📝 **اسم الفيديو:** {title}\n\n⚙️ اختر صيغة التحميل التي تريدها:"
+            
+            await status_msg.delete()
+            
+            if thumbnail:
+                await bot.send_file(event.chat_id, thumbnail, caption=caption_text, buttons=buttons)
+            else:
+                await event.respond(caption_text, buttons=buttons)
+                
+        except Exception as e:
+            try:
+                await status_msg.delete()
+            except:
+                pass
+            error_msg = str(e)
+            if "Sign in to confirm you" in error_msg:
+                await event.respond("❌ يوتيوب يطلب تسجيل الدخول. يرجى التأكد من ملف الـ `cookies.txt` الخاص بك.")
+            else:
+                await event.respond(f"❌ فشل جلب معلومات الرابط.\nالسبب: {error_msg}")
     else:
         if event.sender_id != DEVELOPER_ID:
             await event.respond("❌ عذراً، هذا الرابط غير مدعوم. يرجى إرسال رابط فيديو يوتيوب صحيح.")
@@ -101,46 +150,29 @@ async def callback_handler(event):
     data = event.data.decode('utf-8')
     user_id = event.sender_id
     
-    if data.startswith("video_") or data.startswith("audio_"):
-        target_user_id = int(data.split("_")[1])
+    if data.startswith("quality_"):
+        parts = data.split("_")
+        quality_type = parts[1]  # best أو audio
+        target_user_id = int(parts[2])
         
         if user_id != target_user_id:
             await event.answer("⚠️ هذه الأزرار ليست لك!", alert=True)
             return
             
-        action = data.split("_")[0]
         url = user_steps.get(user_id)
         
         if not url:
             await event.edit("❌ انتهت صلاحية الجلسة، يرجى إرسال الرابط مجدداً.")
             return
             
-        await event.edit("⏳ جاري معالجة الرابط وبدء التحميل، يرجى الانتظار...")
+        await event.edit("⏳ جاري بدء التحميل الفعلي الآن، يرجى الانتظار...")
         
-        chosen_ua = random.choice(USER_AGENTS)
+        ydl_opts = get_base_ydl_opts()
+        ydl_opts['outtmpl'] = f'downloads/{user_id}_%(id)s.%(ext)s'
         
-        # إعدادات yt-dlp مع تفعيل ملف الكوكيز بشكل إجباري
-        ydl_opts = {
-            'outtmpl': f'downloads/{user_id}_%(id)s.%(ext)s',
-            'quiet': True,
-            'no_warnings': True,
-            'socket_timeout': 30,
-            'retries': 5,
-            'nocheckcertificate': True,
-            'http_headers': {
-                'User-Agent': chosen_ua,
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-            }
-        }
-
-        # الربط الإجباري بملف الكوكيز إذا كان موجوداً
-        if os.path.exists(COOKIES_FILE):
-            ydl_opts['cookiefile'] = COOKIES_FILE
-        
-        if action == "video":
-            ydl_opts['format'] = 'best'
-        elif action == "audio":
+        if quality_type == "best":
+            ydl_opts['format'] = 'best'  # سحب الفيديو الأصلي الجاهز بدون دمج خارجي لتجنب الخطأ
+        elif quality_type == "audio":
             ydl_opts['format'] = 'bestaudio/best'
             ydl_opts['postprocessors'] = [{
                 'key': 'FFmpegExtractAudio',
@@ -160,12 +192,12 @@ async def callback_handler(event):
             file_path = info['file_path']
             title = info.get('title', 'YouTube Media')
             
-            await event.respond(f"📥 جاري رفع الملف الآن: **{title}**")
+            await event.respond(f"📥 جاري رفع الملف إلى تليجرام: **{title}**")
             
-            if action == "video":
-                await bot.send_file(event.chat_id, file_path, caption=f"🎬 **{title}**\n\nتم التحميل بنجاح.")
-            elif action == "audio":
+            if quality_type == "audio":
                 await bot.send_file(event.chat_id, file_path, caption=f"🎵 **{title}**\n\nتم التحميل بنجاح.", voice_note=False)
+            else:
+                await bot.send_file(event.chat_id, file_path, caption=f"🎬 **{title}**\n\nتم التحميل بالجودة الأصلية بنجاح.")
                 
             if os.path.exists(file_path):
                 os.remove(file_path)
@@ -175,9 +207,8 @@ async def callback_handler(event):
                 
         except Exception as e:
             error_msg = str(e)
-            # تنبيه ذكي إذا اختفت الكوكيز أو انتهت صلاحيتها
             if "Sign in to confirm you" in error_msg:
-                await event.respond("❌ فشل التحميل: يوتيوب يطلب تسجيل الدخول. ملف `cookies.txt` قد يكون غير موجود أو انتهت صلاحيته.")
+                await event.respond("❌ فشل التحميل: يوتيوب يمنع البوت ويطلب كوكيز جديدة وصالحة.")
             else:
                 await event.respond(f"❌ حدث خطأ أثناء التحميل.\nالسبب: {error_msg}")
             if user_id in user_steps:
@@ -204,5 +235,5 @@ if __name__ == '__main__':
     flask_thread.daemon = True
     flask_thread.start()
     
-    print("🤖 البوت جاهز ومستعد...")
+    print("🤖 البوت المطور جاهز الآن...")
     bot.run_until_disconnected()
