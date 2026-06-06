@@ -10,49 +10,46 @@ from yt_dlp import YoutubeDL
 # تفعيل nest_asyncio لمنع تضارب تشغيل Flask مع Telethon
 nest_asyncio.apply()
 
-# --- بيانات المطور والبوت المقدمة ---
+# --- بيانات المطور والبوت ---
 API_ID = 27485469
 API_HASH = '544459a0701b32741254945b08daebfe'
 BOT_TOKEN = '8277082493:AAEjNtAo4GroDkM0-mIFNLxhgLZ-53qalBg'
 DEVELOPER_ID = 8456056018
 DEVELOPER_USERNAME = '@Eror_7'
 
-# --- قائمة متصفحات الموبايل الحديثة للتمويه (تغني عن الكوكيز والـ VPN) ---
+# مسار ملف الكوكيز الأساسي
+COOKIES_FILE = 'cookies.txt'
+
+# --- قائمة متصفحات الموبايل الحديثة للتمويه ---
 USER_AGENTS = [
     "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
-    "Mozilla/5.0 (Android 14; Mobile; rv:125.0) Gecko/125.0 Firefox/125.0"
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 ]
-
-# --- إعداد ملف الكوكيز (تم إبقاؤه لسلامة الكود ولكن معطل بالخلفية) ---
-COOKIES_FILE = 'cookies.txt'
-if not os.path.exists(COOKIES_FILE):
-    with open(COOKIES_FILE, 'w', encoding='utf-8') as f:
-        f.write("# Netscape HTTP Cookie File\n")
 
 # --- إعداد تطبيق Flask (الويب الصغير) ---
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return """
+    cookies_status = "نشط وموجود" if os.path.exists(COOKIES_FILE) else "غير موجود! يرجى رفعه"
+    return f"""
     <html>
         <head>
             <title>YouTube Downloader Bot Status</title>
             <style>
-                body { font-family: Arial, sans-serif; text-align: center; background-color: #2c3e50; color: white; padding-top: 50px; }
-                h1 { color: #e74c3c; }
-                .status { font-size: 24px; color: #2ecc71; }
-                .info { margin-top: 20px; font-size: 18px; color: #bdc3c7; }
+                body {{ font-family: Arial, sans-serif; text-align: center; background-color: #2c3e50; color: white; padding-top: 50px; }}
+                h1 {{ color: #e74c3c; }}
+                .status {{ font-size: 24px; color: #2ecc71; }}
+                .info {{ margin-top: 20px; font-size: 18px; color: #bdc3c7; }}
             </style>
         </head>
         <body>
             <h1>YouTube Downloader Bot</h1>
             <p class="status">● البوت يعمل بنجاح الآن</p>
             <div class="info">
-                <p>المطور: <a href="https://t.me/Eror_7" style="color:#3498db; text-decoration:none;">@Eror_7</a></p>
-                <p>نظام الكوكيز: نشط ومفعل (cookies.txt)</p>
+                <p>المطور: <a href="https://t.me/Eror_7" style="color:#3498db; text-decoration:none;">{DEVELOPER_USERNAME}</a></p>
+                <p>نظام الكوكيز: {cookies_status}</p>
             </div>
         </body>
     </html>
@@ -65,7 +62,6 @@ def run_flask():
 # --- إعداد بوت التليجرام ---
 bot = TelegramClient('yt_downloader_bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-# تخزين مؤقت لروابط المستخدمين
 user_steps = {}
 
 @bot.on(events.NewMessage(pattern='/start'))
@@ -97,9 +93,7 @@ async def link_handler(event):
         ]
         await event.respond("⚙️ اختر صيغة التحميل المناسبة لك:", buttons=buttons)
     else:
-        if event.sender_id == DEVELOPER_ID:
-            pass
-        else:
+        if event.sender_id != DEVELOPER_ID:
             await event.respond("❌ عذراً، هذا الرابط غير مدعوم. يرجى إرسال رابط فيديو يوتيوب صحيح.")
 
 @bot.on(events.CallbackQuery)
@@ -123,10 +117,9 @@ async def callback_handler(event):
             
         await event.edit("⏳ جاري معالجة الرابط وبدء التحميل، يرجى الانتظار...")
         
-        # اختيار متصفح عشوائي لكل عملية لكسر حماية يوتيوب
         chosen_ua = random.choice(USER_AGENTS)
         
-        # إعدادات متطورة ومحدثة للعمل بدون كوكيز وبدون بروكسي/VPN
+        # إعدادات yt-dlp مع تفعيل ملف الكوكيز بشكل إجباري
         ydl_opts = {
             'outtmpl': f'downloads/{user_id}_%(id)s.%(ext)s',
             'quiet': True,
@@ -138,18 +131,14 @@ async def callback_handler(event):
                 'User-Agent': chosen_ua,
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.5',
-                'Sec-Fetch-Mode': 'navigate',
-            },
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'ios'], # محاكاة تطبيقات الموبايل لتخطي الكوكيز
-                    'skip': ['dash', 'hls']
-                }
             }
         }
+
+        # الربط الإجباري بملف الكوكيز إذا كان موجوداً
+        if os.path.exists(COOKIES_FILE):
+            ydl_opts['cookiefile'] = COOKIES_FILE
         
         if action == "video":
-            # صيغة 'best' تجلب فيديو مدمج جاهز بطلب واحد لتقليل الضغط وتجنب حظر الـ IP
             ydl_opts['format'] = 'best'
         elif action == "audio":
             ydl_opts['format'] = 'bestaudio/best'
@@ -163,8 +152,7 @@ async def callback_handler(event):
             if not os.path.exists('downloads'):
                 os.makedirs('downloads')
                 
-            # تأخير عشوائي بسيط (من ثانية إلى 3 ثوانٍ) لمنع خوارزميات يوتيوب من رصد البوت
-            await asyncio.sleep(random.uniform(1.0, 3.0))
+            await asyncio.sleep(random.uniform(1.0, 2.0))
                 
             loop = asyncio.get_event_loop()
             info = await loop.run_in_executor(None, lambda: download_media(url, ydl_opts))
@@ -175,9 +163,9 @@ async def callback_handler(event):
             await event.respond(f"📥 جاري رفع الملف الآن: **{title}**")
             
             if action == "video":
-                await bot.send_file(event.chat_id, file_path, caption=f"🎬 **{title}**\n\nتم التحميل بواسطة البوت الخاص بك.")
+                await bot.send_file(event.chat_id, file_path, caption=f"🎬 **{title}**\n\nتم التحميل بنجاح.")
             elif action == "audio":
-                await bot.send_file(event.chat_id, file_path, caption=f"🎵 **{title}**\n\nتم التحميل بواسطة البوت الخاص بك.", voice_note=False)
+                await bot.send_file(event.chat_id, file_path, caption=f"🎵 **{title}**\n\nتم التحميل بنجاح.", voice_note=False)
                 
             if os.path.exists(file_path):
                 os.remove(file_path)
@@ -187,7 +175,11 @@ async def callback_handler(event):
                 
         except Exception as e:
             error_msg = str(e)
-            await event.respond(f"❌ حدث خطأ أثناء التحميل أو الرفع.\nالسبب: {error_msg}")
+            # تنبيه ذكي إذا اختفت الكوكيز أو انتهت صلاحيتها
+            if "Sign in to confirm you" in error_msg:
+                await event.respond("❌ فشل التحميل: يوتيوب يطلب تسجيل الدخول. ملف `cookies.txt` قد يكون غير موجود أو انتهت صلاحيته.")
+            else:
+                await event.respond(f"❌ حدث خطأ أثناء التحميل.\nالسبب: {error_msg}")
             if user_id in user_steps:
                 del user_steps[user_id]
 
@@ -207,10 +199,10 @@ def download_media(url, opts):
         return info_dict
 
 if __name__ == '__main__':
-    print("⚡ جاري تشغيل سيرفر الويب المدمج...")
+    print("⚡ جاري تشغيل سيرفر الويب...")
     flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
     
-    print("🤖 البوت يعمل الآن بنجاح ومستعد لاستقبال الروابط...")
+    print("🤖 البوت جاهز ومستعد...")
     bot.run_until_disconnected()
