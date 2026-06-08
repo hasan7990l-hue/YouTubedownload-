@@ -63,13 +63,14 @@ def run_telegram_bot():
 
         status_msg = await event.respond("🔍 جاري فحص الرابط وتخطي الحماية، يرجى الانتظار...")
         
-        # إعدادات تمويه قوية لتخطي حظر السيرفرات والـ HTTP Error
+        # إعدادات تمويه قوية لتخطي حظر السيرفرات والـ HTTP Error مع تفعيل نظام الكوكيز
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'referer': 'https://www.google.com/',
-            'nocheckcertificate': True
+            'nocheckcertificate': True,
+            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None
         }
         
         try:
@@ -112,7 +113,8 @@ def run_telegram_bot():
             'referer': 'https://www.google.com/',
             'nocheckcertificate': True,
             'quiet': True,
-            'outtmpl': outtmpl
+            'outtmpl': outtmpl,
+            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None
         }
 
         if download_type == "vid":
