@@ -63,14 +63,15 @@ def run_telegram_bot():
 
         status_msg = await event.respond("🔍 جاري فحص الرابط وتخطي الحماية، يرجى الانتظار...")
         
-        # إعدادات تمويه قوية لتخطي حظر السيرفرات والـ HTTP Error مع تفعيل نظام الكوكيز
+        # إعدادات تمويه قوية جداً ومحدثة لتخطي حظر يوتيوب لعام 2026 داخل سيرفرات الاستضافة
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'referer': 'https://www.google.com/',
             'nocheckcertificate': True,
-            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None
+            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}} # تمويه العميل لتفادي الحظر
         }
         
         try:
@@ -109,18 +110,18 @@ def run_telegram_bot():
         outtmpl = f"downloads/{video_id}_%(title)s.%(ext)s"
 
         base_opts = {
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'referer': 'https://www.google.com/',
             'nocheckcertificate': True,
             'quiet': True,
             'outtmpl': outtmpl,
-            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None
+            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
         }
 
-        # تعديل ذكي ومضمون للصيغ والخيارات لتجنب خطأ (Requested format is not available)
+        # الاعتماد على جلب صيغ مدمجة مباشرة لتجنب أخطاء الفلاتر المفقودة بالاستضافات السحابية
         if download_type == "vid":
-            # تم تعديل هذا السطر لضمان جلب ملف يحتوي على فيديو وصوت مدمجين تلقائياً لحل مشكلة غياب الـ FFmpeg بالسيرفرات المجانية
-            base_opts['format'] = 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best'
+            base_opts['format'] = 'mp4' # جلب صيغة MP4 المدمجة الجاهزة مباشرة لتجنب خطأ الـ Format
         else:
             base_opts['format'] = 'bestaudio/best'
             base_opts['postprocessors'] = [{
@@ -130,11 +131,27 @@ def run_telegram_bot():
             }]
 
         try:
-            with YoutubeDL(base_opts) as ydl:
-                info = ydl.extract_info(video_url, download=True)
-                filename = ydl.prepare_filename(info)
-                if download_type == "aud":
-                    filename = os.path.splitext(filename)[0] + ".mp3"
+            filename = None
+            try:
+                with YoutubeDL(base_opts) as ydl:
+                    info = ydl.extract_info(video_url, download=True)
+                    filename = ydl.prepare_filename(info)
+                    if download_type == "aud" and os.path.exists(os.path.splitext(filename)[0] + ".mp3"):
+                        filename = os.path.splitext(filename)[0] + ".mp3"
+            except Exception as inner_error:
+                # محاولة طوارئ احتياطية في حال تعطل الفلاتر بالكامل بسبب قيود الاستضافة
+                if download_type == "aud" and 'postprocessors' in base_opts:
+                    base_opts.pop('postprocessors')
+                    base_opts['format'] = 'bestaudio/best'
+                    with YoutubeDL(base_opts) as ydl:
+                        info = ydl.extract_info(video_url, download=True)
+                        filename = ydl.prepare_filename(info)
+                else:
+                    # محاولة أخيرة لتحميل الفيديو بأي صيغة متوفرة ومتاحة بشكل عاجل
+                    base_opts['format'] = 'best'
+                    with YoutubeDL(base_opts) as ydl:
+                        info = ydl.extract_info(video_url, download=True)
+                        filename = ydl.prepare_filename(info)
 
             await progress_msg.edit("🚀 جاري رفع الملف الناتج الآن إلى تليجرام...")
             
@@ -143,13 +160,13 @@ def run_telegram_bot():
             else:
                 await bot.send_file(event.chat_id, filename, caption=f"🎵 تم تحميل الصوت بنجاح عبر {SOURCE_CHANNEL}")
                 
-            if os.path.exists(filename):
+            if filename and os.path.exists(filename):
                 os.remove(filename)
             await progress_msg.delete()
 
         except Exception as e:
-            await progress_msg.edit("❌ فشل تحميل الملف الفعلي. قد يكون الحجم ضخماً جداً بالنسبة للاستضافة المجانية أو تم حظر العملية.")
-            if 'filename' in locals() and os.path.exists(filename):
+            await progress_msg.edit("❌ فشل تحميل الملف الفعلي بسبب قيود الاستضافة أو حجم الملف الكبير جداً.")
+            if 'filename' in locals() and filename and os.path.exists(filename):
                 os.remove(filename)
 
     bot.run_until_disconnected()
