@@ -63,7 +63,7 @@ async def check_subscription(user_id):
 async def check_group_subscription(chat_id, user_id):
     not_joined = []
     # إذا لم يقم أدمن المجموعة بتعيين أي قناة، فلن يتم إجبار الأعضاء على شيء
-    if chat_id携not in BOT_CONFIG["user_channels"] or not BOT_CONFIG["user_channels"][chat_id]:
+    if chat_id not in BOT_CONFIG["user_channels"] or not BOT_CONFIG["user_channels"][chat_id]:
         return not_joined
         
     for channel in BOT_CONFIG["user_channels"][chat_id]:
@@ -162,8 +162,12 @@ async def start_handler(event):
                 await event.respond(welcome_text, buttons=user_buttons)
 
 # نظام إعداد تعيين قنوات الاشتراك الإجباري للمستخدمين داخل مجموعاتهم الخاصة
-@bot_client.on(events.NewMessage(groups_only=True))
+@bot_client.on(events.NewMessage)
 async def group_admin_commands_handler(event):
+    # التأكد من أن الرسالة قادمة من مجموعة أو قنوات فائقة وليست خاصة
+    if not (event.is_group or event.is_channel):
+        return
+
     text = event.text.strip()
     chat_id = event.chat_id
     user_id = event.sender_id
