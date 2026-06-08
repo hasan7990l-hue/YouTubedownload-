@@ -1,3 +1,4 @@
 streamlit
 telethon
+nest_asyncio
 cryptography
