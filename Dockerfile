@@ -1,29 +1,16 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
-ENV DEBIAN_FRONTEND=noninteractive
+# تثبيت أداة ffmpeg وتحديث النظام داخل الحاوية
+RUN apt-get update && apt-get install -y ffmpeg && apt-get clean
 
-# تثبيت FFmpeg وتحديث النظام بالكامل
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
 
-WORKDIR /code
+COPY . /app
 
-# نسخ ملف المتطلبات
-COPY ./requirements.txt /code/requirements.txt
+# تثبيت المكتبات وتحديث yt-dlp لإصدار 2026 لتخطي الحظر
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade --force-reinstall yt-dlp
 
-# تحديث pip وتثبيت المكتبات، مع إجبار ترقية yt-dlp لآخر تحديث متوفر لمنع الحظر
-RUN python -m pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /code/requirements.txt && \
-    pip install --no-cache-dir --upgrade yt-dlp
+EXPOSE 8501
 
-# نسخ باقي ملفات المشروع
-COPY . .
-
-# إنشاء مجلد التحميلات ومجلد الجلسات وإعطائهما صلاحيات كاملة
-RUN mkdir -p /code/downloads && chmod 777 /code/downloads
-
-# فتح البورت المتوافق مع معظم الاستضافات الحديثة (مثل Hugging Face التي تفضل 7860 أو Render 10000)
-# ملاحظة: يمكنك تركه 5000 إذا كنت قد ضبطت الاستضافة لقراءة بورت 5000
-EXPOSE 7860
-
-# تشغيل التطبيق
-CMD ["python", "app.py"]
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
