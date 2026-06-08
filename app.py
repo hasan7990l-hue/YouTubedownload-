@@ -63,15 +63,18 @@ def run_telegram_bot():
 
         status_msg = await event.respond("🔍 جاري فحص الرابط وتخطي الحماية، يرجى الانتظار...")
         
-        # إعدادات تمويه قوية جداً ومحدثة لتخطي حظر يوتيوب لعام 2026 داخل سيرفرات الاستضافة
+        # إعدادات تمويه مخصصة للسيرفرات لكسر حظر يوتيوب 2026 والاعتماد على الكوكيز المرفوعة
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'referer': 'https://www.google.com/',
             'nocheckcertificate': True,
             'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
-            'extractor_args': {'youtube': {'player_client': ['android', 'web']}} # تمويه العميل لتفادي الحظر
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios', 'tvhtml5'],
+                    'skip': ['webpage', 'hls']
+                }
+            }
         }
         
         try:
@@ -93,6 +96,7 @@ def run_telegram_bot():
             await event.respond(choice_text, buttons=buttons)
 
         except Exception as e:
+            print(f"DEBUG ERROR: {str(e)}")
             await status_msg.edit("❌ عذراً، واجه السيرفر قيوداً من يوتيوب أثناء قراءة هذا الرابط.\nيرجى محاولة إرسال رابط فيديو آخر أو التأكد من أن الرابط ليس خاصاً.")
 
     # --- حدث الضغط على أزرار التحميل ---
@@ -110,18 +114,21 @@ def run_telegram_bot():
         outtmpl = f"downloads/{video_id}_%(title)s.%(ext)s"
 
         base_opts = {
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'referer': 'https://www.google.com/',
             'nocheckcertificate': True,
             'quiet': True,
             'outtmpl': outtmpl,
             'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
-            'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios', 'tvhtml5'],
+                    'skip': ['webpage', 'hls']
+                }
+            }
         }
 
-        # الاعتماد على جلب صيغ مدمجة مباشرة لتجنب أخطاء الفلاتر المفقودة بالاستضافات السحابية
+        # استخدام صيغ مدمجة مباشرة لتجنب الاعتماد الإجباري على المعالجة الخارجية في حال نقص حزم الـ Docker
         if download_type == "vid":
-            base_opts['format'] = 'mp4' # جلب صيغة MP4 المدمجة الجاهزة مباشرة لتجنب خطأ الـ Format
+            base_opts['format'] = 'mp4/best' 
         else:
             base_opts['format'] = 'bestaudio/best'
             base_opts['postprocessors'] = [{
@@ -139,7 +146,6 @@ def run_telegram_bot():
                     if download_type == "aud" and os.path.exists(os.path.splitext(filename)[0] + ".mp3"):
                         filename = os.path.splitext(filename)[0] + ".mp3"
             except Exception as inner_error:
-                # محاولة طوارئ احتياطية في حال تعطل الفلاتر بالكامل بسبب قيود الاستضافة
                 if download_type == "aud" and 'postprocessors' in base_opts:
                     base_opts.pop('postprocessors')
                     base_opts['format'] = 'bestaudio/best'
@@ -147,7 +153,6 @@ def run_telegram_bot():
                         info = ydl.extract_info(video_url, download=True)
                         filename = ydl.prepare_filename(info)
                 else:
-                    # محاولة أخيرة لتحميل الفيديو بأي صيغة متوفرة ومتاحة بشكل عاجل
                     base_opts['format'] = 'best'
                     with YoutubeDL(base_opts) as ydl:
                         info = ydl.extract_info(video_url, download=True)
