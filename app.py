@@ -24,14 +24,14 @@ API_HASH = '544459a0701b32741254945b08daebfe'
 BOT_TOKEN = '8442853121:AAGIKd_rM5_o9p8ea7XqYtB3fM0KRlqsfc4'
 DEVELOPER_ID = 8456056018
 
-# حقوق المطور والسورس الثابتة
+# حقوق المطور والسورس الثابتة (تمت إضافة قناة السورس الخاصة بك هنا وحذف الوهمي)
 DEV_USERNAME = "@Eror_7"
-SOURCE_CHANNEL = "@YourSourceChannel"  # ضع هنا معرف قناة السورس الخاصة بك
+SOURCE_CHANNEL = "@lb2_c"
 
 # --- 3. قاعدة البيانات المؤقتة في الذاكرة (تخزين إعدادات البوت والتحكم) ---
 if 'BOT_CONFIG' not in globals():
     BOT_CONFIG = {
-        "channels": [],           # تم حذف القنوات الوهمية للمطور وجعلها فارغة افتراضياً لحين تعيينها
+        "channels": [],           # تم مسح القنوات الوهمية تماماً ليكون التحكم عبر الأزرار نظيفاً ومن الصفر
         "user_channels": {},      # تخزين قنوات المستخدمين للمجموعات بتنسيق: {chat_id: ["@ch1", "@ch2"]}
         "user_welcome": "🎉 **أهلاً بك في البوت!**\n\nلقد تم التحقق من اشتراكك بنجاح، يمكنك الآن إرسال الرسائل في المجموعات بحرية.",
         "user_media": None,       # ملف الميديا الخاص بواجهة المستخدمين (file_id أو مسار)
@@ -88,7 +88,7 @@ async def is_user_admin(chat_id, user_id):
         logger.error(f"خطأ أثناء التحقق من رتبة العضو: {e}")
     return False
 
-# --- 4. دالة توليد لوحة التحكم للمطور (تم دمج أزرار واجهة المستخدمين معها لكي تظهر للمطور) ---
+# --- 4. دالة توليد لوحة التحكم المتقدمة للمطور ---
 async def send_admin_panel(event, edit=False):
     try:
         dev_entity = await bot_client.get_entity(DEVELOPER_ID)
@@ -98,19 +98,16 @@ async def send_admin_panel(event, edit=False):
 
     admin_text = (
         f"👑 **مرحباً بك يا {dev_name} في لوحة تحكم البوت المتقدمة!**\n\n"
-        f"⚙️ يمكنك التحكم الكامل بإعدادات القنوات، الميديا، والإحصائيات من خلال الأزرار أدناه.\n\n"
-        f"👇 **قسم واجهة المستخدمين (للمعاينة والتجربة):**"
+        f"⚙️ يمكنك التحكم الكامل بإعدادات القنوات الافتراضية، الاختيارية، الميديا، والإحصائيات من خلال الأزرار أدناه."
     )
     
-    # دمج لوحة التحكم مع أزرار واجهة المستخدم لضمان ظهور كل شيء للمطور
     buttons = [
         [Button.inline("📊 إحصائيات البوت الكاملة", data="admin_stats")],
-        [Button.inline("📢 تعيين قنوات الاشتراك (حد أقصى 3)", data="admin_set_channels")],
+        [Button.inline("📢 تعيين قنوات الاشتراك (اختياري 1 إلى 3)", data="admin_set_channels")],
         [Button.inline("🖼️ تعيين ميديا واجهة المستخدمين", data="admin_media_user")],
         [Button.inline("⚙️ تعيين ميديا لوحة التحكم", data="admin_media_admin")],
         [Button.inline("📝 تعديل رسالة ترحيب المستخدمين", data="admin_set_welcome")],
-        [Button.url("👨‍💻 مطور البوت (واجهة المستخدم)", f"https://t.me/{DEV_USERNAME.replace('@', '')}")],
-        [Button.url("📢 قناة السورس (واجهة المستخدم)", f"https://t.me/{SOURCE_CHANNEL.replace('@', '')}")],
+        [Button.inline("🔙 العودة للواجهة الرئيسية", data="admin_to_user_interface")],
         [Button.inline("❌ إغلاق اللوحة", data="admin_close")]
     ]
     
@@ -127,25 +124,24 @@ async def send_admin_panel(event, edit=False):
 
 # --- 5. معالجات الأحداث للأوامر والبوت ولوحة التحكم ---
 
-# أمر /start في الخاص (يميز تلقائياً بين المطور والمستخدم العادي)
+# أمر /start في الخاص (يظهر واجهة المستخدمين للجميع، مع زر الإعدادات السري للمطور فقط)
 @bot_client.on(events.NewMessage(pattern='/start'))
 async def start_handler(event):
     if event.is_private:
         user_id = event.sender_id
         BOT_CONFIG["stats_users"].add(user_id)
         
-        # إذا كان المطور هو من أرسل /start، تظهر له اللوحة مدمجة بالكامل مع أزرار المعاينة للمستخدمين
-        if user_id == DEVELOPER_ID:
-            await send_admin_panel(event, edit=False)
-            return
-
-        # بالنسبة للمستخدم العادي
         missing_channels = await check_subscription(user_id)
         
+        # أزرار واجهة المستخدمين الأساسية الثابتة
         user_buttons = [
             [Button.url("👨‍💻 مطور البوت", f"https://t.me/{DEV_USERNAME.replace('@', '')}")],
             [Button.url("📢 قناة السورس", f"https://t.me/{SOURCE_CHANNEL.replace('@', '')}")]
         ]
+        
+        # إذا كان مرسل الأمر هو المطور، يتم حقن زر "الإعدادات" في نهاية القائمة بشكل حصري وسري
+        if user_id == DEVELOPER_ID:
+            user_buttons.append([Button.inline("⚙️ الإعدادات (خاص بالمطور)", data="admin_open_panel")])
         
         if missing_channels:
             buttons = []
@@ -170,7 +166,6 @@ async def start_handler(event):
 # نظام إعداد تعيين قنوات الاشتراك الإجباري للمستخدمين داخل مجموعاتهم الخاصة
 @bot_client.on(events.NewMessage)
 async def group_admin_commands_handler(event):
-    # التأكد من أن الرسالة قادمة من مجموعة أو قنوات فائقة وليست خاصة
     if not (event.is_group or event.is_channel):
         return
 
@@ -178,14 +173,12 @@ async def group_admin_commands_handler(event):
     chat_id = event.chat_id
     user_id = event.sender_id
 
-    # التحقق من الأوامر المطلوبة: (تعيين اشتراك أو اضف) و (مسح الاشتراك أو حذف)
     is_set_command = text.startswith('/setsub') or text.startswith('تعيين اشتراك') or text.startswith('اضف')
     is_delete_command = text.startswith('/delsub') or text.startswith('مسح الاشتراك') or text.startswith('حذف')
 
     if not (is_set_command or is_delete_command):
         return
 
-    # التحقق التلقائي من أن مرسل الأمر هو مشرف أو مالك المجموعة حصراً
     if not await is_user_admin(chat_id, user_id):
         warn = await event.reply("⚠️ **عذراً، هذا الأمر مخصص فقط لمشرفي المجموعة!**")
         await asyncio.sleep(10)
@@ -196,30 +189,29 @@ async def group_admin_commands_handler(event):
             pass
         return
 
-    # معالجة أمر التعيين والإضافة
+    # معالجة أمر التعيين والإضافة الاختيارية
     if is_set_command:
         parts = text.split(" ")
-        # استخراج المعرفات التي تبدأ بـ @ من الرسالة
         channels = [ch.strip() for ch in parts if ch.strip().startswith("@")]
         
         if not channels:
-            await event.reply("❌ **خطأ في التنسيق!** يرجى كتابة الأمر يليه معرف القناة تبدأ بـ @\n\n*مثال:* `تعيين اشتراك @MyChannel`\n*أو:* `اضف @MyChannel1 @MyChannel2` *(حد أقصى 3 قنوات)*")
+            await event.reply("❌ **خطأ في التنسيق!** يرجى كتابة الأمر يليه معرف القناة تبدأ بـ @\n\n*يمكنك إضافة قنوات بشكل اختياري (من 1 إلى 3 قنوات максимум):*\n*مثال بقناة واحدة:* `تعيين اشتراك @MyChannel`\n*مثال بقناتين:* `اضف @Ch1 @Ch2`")
             return
             
-        # حفظ القنوات بحد أقصى 3 قنوات للمجموعة
+        # حفظ القنوات بشكل اختياري حسب مدخلات المستخدم (بحد أقصى 3)
         BOT_CONFIG["user_channels"][chat_id] = channels[:3]
         current_subs = ", ".join(BOT_CONFIG["user_channels"][chat_id])
-        await event.reply(f"✅ **تم حفظ قنوات الاشتراك الإجباري لهذه المجموعة بنجاح!**\n📢 القنوات النشطة الآن: {current_subs}\n\n*سيتم الآن إجبار الأعضاء (غير المشرفين) على الاشتراك بها قبل التمكن من إرسال الرسائل.*")
+        await event.reply(f"✅ **تم حفظ قنوات الاشتراك الإجباري الاختيارية لهذه المجموعة بنجاح!**\n📢 القنوات النشطة حالياً: {current_subs}\n\n*سيتم الآن إجبار الأعضاء على الاشتراك بها قبل التمكن من الكتابة.*")
 
-    # معالجة أمر الحذف والمسح
+    # معالجة أمر الحذف والمسح الكامل
     elif is_delete_command:
         if chat_id in BOT_CONFIG["user_channels"]:
             BOT_CONFIG["user_channels"].pop(chat_id, None)
-            await event.reply("❌ **تم مسح قنوات الاشتراك الإجباري لهذه المجموعة بنجاح!**\nيمكن الآن لجميع الأعضاء الكتابة بحرية دون قيود.")
+            await event.reply("❌ **تم حذف ومسح قنوات الاشتراك الإجباري لهذه المجموعة بنجاح!**\nيمكن الآن لجميع الأعضاء الكتابة بحرية دون أي قيود اشتراك.")
         else:
-            await event.reply("⚠️ **لا توجد قنوات اشتراك إجباري معينة لهذه المجموعة بالفعل.**")
+            await event.reply("⚠️ **لا توجد قنوات اشتراك إجباري معينة لهذه المجموعة ليتم حذفها.**")
 
-# التفاعل مع الأزرار الشفافة (لوحة التحكم + تأكيد الاشتراك)
+# التفاعل مع الأزرار الشفافة (لوحة التحكم + تأكيد الاشتراك + فتح الإعدادات للمطور)
 @bot_client.on(events.CallbackQuery)
 async def callback_handler(event):
     data = event.data.decode('utf-8')
@@ -235,6 +227,8 @@ async def callback_handler(event):
             buttons.append([Button.inline("🔄 تم الاشتراك (تأكيد)", data="check_sub")])
             buttons.append([Button.url("👨‍💻 مطور البوت", f"https://t.me/{DEV_USERNAME.replace('@', '')}")])
             buttons.append([Button.url("📢 قناة السورس", f"https://t.me/{SOURCE_CHANNEL.replace('@', '')}")])
+            if user_id == DEVELOPER_ID:
+                buttons.append([Button.inline("⚙️ الإعدادات (خاص بالمطور)", data="admin_open_panel")])
             
             await event.answer("❌ أنت لم تشترك في جميع القنوات بعد!", alert=True)
             text = "⚠️ **ما زلت غير مشترك في بعض القنوات الإلزامية!**"
@@ -246,6 +240,8 @@ async def callback_handler(event):
                 [Button.url("👨‍💻 مطور البوت", f"https://t.me/{DEV_USERNAME.replace('@', '')}")],
                 [Button.url("📢 قناة السورس", f"https://t.me/{SOURCE_CHANNEL.replace('@', '')}")]
             ]
+            if user_id == DEVELOPER_ID:
+                user_buttons.append([Button.inline("⚙️ الإعدادات (خاص بالمطور)", data="admin_open_panel")])
             try:
                 await event.delete()
             except Exception:
@@ -256,6 +252,14 @@ async def callback_handler(event):
                 await bot_client.send_message(event.chat_id, welcome_text, buttons=user_buttons)
         return
 
+    # فتح لوحة التحكم من خلال زر الإعدادات السري للمطور
+    if data == "admin_open_panel":
+        if user_id != DEVELOPER_ID:
+            await event.answer("⚠️ عذراً، هذا الزر مخصص للمطور فقط.", alert=True)
+            return
+        await send_admin_panel(event, edit=True)
+        return
+
     if user_id != DEVELOPER_ID:
         await event.answer("⚠️ عذراً، هذه اللوحة مخصصة للمطور فقط.", alert=True)
         return
@@ -263,7 +267,7 @@ async def callback_handler(event):
     if data == "admin_stats":
         total_users = len(BOT_CONFIG["stats_users"])
         total_groups = len(BOT_CONFIG["stats_groups"])
-        current_ch = ", ".join(BOT_CONFIG["channels"]) if BOT_CONFIG["channels"] else "لا يوجد قنوات معينة حالياً"
+        current_ch = ", ".join(BOT_CONFIG["channels"]) if BOT_CONFIG["channels"] else "لا يوجد (لم يتم تعيين قنوات)"
         
         stats_msg = (
             f"📊 **إحصائيات الخادم والبوت الشاملة:**\n\n"
@@ -278,7 +282,7 @@ async def callback_handler(event):
 
     elif data == "admin_set_channels":
         BOT_CONFIG["awaiting_input"][user_id] = "set_channels"
-        await event.edit("📢 **قم بإرسال معرفات قنوات المطور الآن في رسالة واحدة**\nحد أقصى 3 قنوات، تفصل بينها بمسافة.\n\nمثال:\n`@Channel1 @Channel2 @Channel3`", buttons=[[Button.inline("❌ إلغاء", data="admin_back")]])
+        await event.edit("📢 **قم بإرسال معرفات قنوات المطور الآن بشكل اختياري (من 1 إلى 3 قنوات)**\nتفصل بينها بمسافة واحدة فقط.\n\nمثال لقناة واحدة:\n`@MyChannel`\nمثال لثلاث قنوات:\n`@Ch1 @Ch2 @Ch3`", buttons=[[Button.inline("❌ إلغاء", data="admin_back")]])
 
     elif data == "admin_media_user":
         BOT_CONFIG["awaiting_input"][user_id] = "media_user"
@@ -295,6 +299,24 @@ async def callback_handler(event):
     elif data == "admin_back":
         BOT_CONFIG["awaiting_input"].pop(user_id, None)
         await send_admin_panel(event, edit=True)
+
+    elif data == "admin_to_user_interface":
+        BOT_CONFIG["awaiting_input"].pop(user_id, None)
+        try:
+            await event.delete()
+        except Exception:
+            pass
+        # إعادة المطور لواجهة المستخدمين العادية مع الحفاظ على زر الإعدادات
+        welcome_text = BOT_CONFIG["user_welcome"]
+        user_buttons = [
+            [Button.url("👨‍💻 مطور البوت", f"https://t.me/{DEV_USERNAME.replace('@', '')}")],
+            [Button.url("📢 قناة السورس", f"https://t.me/{SOURCE_CHANNEL.replace('@', '')}")],
+            [Button.inline("⚙️ الإعدادات (خاص بالمطور)", data="admin_open_panel")]
+        ]
+        if BOT_CONFIG["user_media"]:
+            await bot_client.send_file(event.chat_id, BOT_CONFIG["user_media"], caption=welcome_text, buttons=user_buttons)
+        else:
+            await bot_client.send_message(event.chat_id, welcome_text, buttons=user_buttons)
 
     elif data == "admin_close":
         BOT_CONFIG["awaiting_input"].pop(user_id, None)
@@ -316,9 +338,10 @@ async def admin_input_handler(event):
             await event.respond("❌ عذراً، المعرفات المرسلة غير صالحة. يرجى إرسال المعرفات تبدأ بـ @")
             return
         
+        # حفظ القنوات اختيارياً من 1 إلى 3 قنوات بنجاح
         BOT_CONFIG["channels"] = channels[:3]
         BOT_CONFIG["awaiting_input"].pop(user_id, None)
-        await event.respond(f"✅ تم حفظ قنوات الاشتراك الإجباري للمطور بنجاح!\nالقنوات الحالية: {', '.join(BOT_CONFIG['channels'])}")
+        await event.respond(f"✅ تم حفظ قنوات الاشتراك الإجباري للمطور بنجاح!\nالقنوات الحالية النشطة: {', '.join(BOT_CONFIG['channels'])}")
         await send_admin_panel(event, edit=False)
 
     elif action == "media_user":
@@ -368,7 +391,7 @@ async def group_protection_handler(event):
         if await is_user_admin(chat_id, user_id):
             return
             
-        # هنا يتم فحص القنوات التي تم تعيينها من قبل مستخدمي/أدمنز هذه المجموعة تحديداً
+        # هنا يتم فحص القنوات الاختيارية التي تم تعيينها من قبل مستخدمي/أدمنز هذه المجموعة تحديداً
         missing_channels = await check_group_subscription(chat_id, user_id)
         
         if missing_channels:
