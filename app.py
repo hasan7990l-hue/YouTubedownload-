@@ -2,42 +2,38 @@ import logging
 import streamlit as st
 import asyncio
 from threading import Thread
-import nest_asyncio
 from telethon import TelegramClient, events, Button
 from telethon.errors import UserNotParticipantError
 from telethon.tl.functions.channels import GetParticipantRequest
 from telethon.tl.functions.channels import GetParticipantRequest as GetGroupParticipantRequest
 from telethon.tl.types import ChannelParticipantAdmin, ChannelParticipantCreator
 
-# تفعيل مكتبة nest_asyncio للسماح بتشغيل الـ Event Loops المتداخلة داخل Streamlit
-nest_asyncio.apply()
-
-# --- 1. إعدادات واجهة Streamlit الأساسية لتشغيل خادم الويب الخاص بك ---
+# --- 1. إعدادات واجهة Streamlit الأساسية لضمان عمل السيرفر 24/7 ---
 st.set_page_config(page_title="Group Forced Subscription Bot", page_icon="🛡️")
 st.title("🛡️ خادم بوت الاشتراك الإجباري للمجموعات")
-st.write("الخادم يعمل الآن بنجاح ومستقر 24/7 لحماية المجموعات وإلزام الأعضاء بالاشتراك.")
+st.markdown("### ⚡ حالة الخادم: **نشط ويعمل بكفاءة**")
+st.info("تم فصل بيئة عمل البوت عن واجهة الويب لمنع تعارض الذاكرة (Weak Reference Error). البوت يعمل الآن بالخلفية بشكل مستمر.")
 
-# إعدادات تسجيل الأخطاء (Logging) لمراقبة عمل البوت
+# إعدادات تسجيل الأخطاء (Logging)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(module)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- 2. البيانات الخاصة بك التي قمت بتزويدي بها ---
+# --- 2. البيانات الخاصة بك ---
 API_ID = 27485469
 API_HASH = '544459a0701b32741254945b08daebfe'
 BOT_TOKEN = '8442853121:AAGIKd_rM5_o9p8ea7XqYtB3fM0KRlqsfc4'
 DEVELOPER_ID = 8456056018
 
 # --- 3. قنوات الاشتراك الإجباري ---
-# قم باستبدال معرفات القنوات هذه بمعرفات قنواتك الخاصة (يجب أن يكون البوت مشرفاً فيها)
 CHANNELS = [
     "@YourChannel1", 
     "@YourChannel2"
 ]
 
-# تهيئة عميل التليجرام (Telethon Client)
+# تهيئة عميل التليجرام خارج نطاق دالة st.cache لتفادي مشاكل الذاكرة
 bot_client = TelegramClient('group_forced_sub_session', API_ID, API_HASH)
 
-# دالة للتحقق مما إذا كان المستخدم مشتركاً في القنوات الإلزامية أم لا
+# دالة للتحقق من الاشتراك
 async def check_subscription(user_id):
     not_joined = []
     for channel in CHANNELS:
@@ -50,7 +46,7 @@ async def check_subscription(user_id):
             not_joined.append(channel)
     return not_joined
 
-# دالة للتحقق مما إذا كان العضو مشرفاً أو مالكاً في المجموعة لتخطيه من الاشتراك الإجباري
+# دالة للتحقق من رتبة العضو في المجموعة
 async def is_user_admin(chat_id, user_id):
     try:
         p = await bot_client(GetGroupParticipantRequest(channel=chat_id, participant=user_id))
@@ -60,9 +56,9 @@ async def is_user_admin(chat_id, user_id):
         logger.error(f"خطأ أثناء التحقق من رتبة العضو: {e}")
     return False
 
-# --- 4. معالجات الأحداث والأوامر للبوت ---
+# --- 4. معالجات الأحداث للأوامر والبوت ---
 
-# معالج أمر البدء /start في الخاص (تأكيد الاشتراك يدوياً)
+# أمر /start في الخاص
 @bot_client.on(events.NewMessage(pattern='/start'))
 async def start_handler(event):
     if event.is_private:
@@ -81,7 +77,7 @@ async def start_handler(event):
             welcome_text = "🎉 **أهلاً بك!**\n\nلقد تم التحقق من اشتراكك بنجاح، يمكنك الآن إرسال الرسائل في المجموعات بحرية."
             await event.respond(welcome_text)
 
-# معالج الضغط على زر التأكيد الشفاف (Inline Callbacks) في الخاص
+# التفاعل مع زر التأكيد الشفاف
 @bot_client.on(events.CallbackQuery(data="check_sub"))
 async def callback_handler(event):
     user_id = event.sender_id
@@ -101,9 +97,7 @@ async def callback_handler(event):
         welcome_text = "🎉 **أهلاً بك!**\n\nلقد تم التحقق من اشتراكك بنجاح، يمكنك الآن إرسال الرسائل في المجموعات بحرية."
         await event.edit(welcome_text, buttons=None)
 
-
-# --- 5. نظام حماية المجموعات (الاشتراك الإجباري للمجموعات) ---
-
+# --- 5. نظام حماية المجموعات (الاشتراك الإجباري) ---
 @bot_client.on(events.NewMessage)
 async def group_protection_handler(event):
     if event.is_group or event.is_channel:
@@ -125,7 +119,7 @@ async def group_protection_handler(event):
             try:
                 await event.delete()
             except Exception as e:
-                logger.error(f"فشل حذف الرسالة (تأكد من رفع البوت مشرفاً بصلاحية الحذف): {e}")
+                logger.error(f"فشل حذف الرسالة: {e}")
                 
             buttons = []
             for index, ch in enumerate(missing_channels, start=1):
@@ -143,23 +137,18 @@ async def group_protection_handler(event):
             except Exception:
                 pass
 
-# --- 6. آلية التشغيل الآمنة بالخلفية لبيئة Streamlit ---
-
-def run_telethon_bot():
-    # إنشاء وحقن Loop مستقل ومحمي للبوت داخل الـ Thread الجديد
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    nest_asyncio.apply()
+# --- 6. آلية التشغيل المعزولة تماماً وخارج نطاق خيوط Streamlit ---
+def run_isolated_bot():
+    # إنشاء حلقة أحداث نظيفة تماماً ومنفصلة عن الـ Streamlit Loop لتلافي خطأ Weak Reference
+    isolated_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(isolated_loop)
     
-    # تشغيل البوت بشكل دائم وثابت
+    # تشغيل الاتصال بالبوت
     bot_client.start(bot_token=BOT_TOKEN)
-    print("⚡ تم تشغيل واستجابة البوت في الخلفية بنجاح واحترافية...")
-    loop.run_until_complete(bot_client.run_until_disconnected())
+    isolated_loop.run_until_complete(bot_client.run_until_disconnected())
 
-# تشغيل الـ Thread لمرة واحدة فقط لضمان عدم تكرار الاتصال عند تحديث الصفحة
-if 'bot_thread_started' not in st.session_state:
-    st.session_state['bot_thread_started'] = True
-    bot_thread = Thread(target=run_telethon_bot, daemon=True)
-    bot_thread.start()
-
-st.success("⚡ تم إطلاق الاتصال والربط المتوازي؛ البوت يستمع الآن للمجموعات بصفة مستمرة.")
+# تشغيل البوت في خيط (Thread) نقي ومستقل عند إقلاع السيرفر لأول مرة
+if 'bot_process_active' not in st.session_state:
+    st.session_state['bot_process_active'] = True
+    backend_thread = Thread(target=run_isolated_bot, daemon=True)
+    backend_thread.start()
