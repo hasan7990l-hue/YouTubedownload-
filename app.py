@@ -1,21 +1,44 @@
 import os
 import asyncio
+import sys
 
 # =====================================================================
 # حل مشكلة حلقة الأحداث (Event Loop) الإلزامي لمنصة Streamlit وبايثون 3.14
 # =====================================================================
 try:
-    asyncio.get_running_loop()
+    loop = asyncio.get_running_loop()
 except RuntimeError:
-    # إنشاء حلقة أحداث جديدة وتعيينها كحلقة رئيسية لمنع خطأ الـ RuntimeError نهائياً
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
+# تثبيت سياسة حلقة الأحداث للخيوط الفرعية (Multi-threading) الخاصة بـ Streamlit
+class WebThreadEventLoopPolicy(asyncio.DefaultEventLoopPolicy):
+    def get_event_loop(self):
+        try:
+            return super().get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            self.set_event_loop(loop)
+            return loop
+
+asyncio.set_event_loop_policy(WebThreadEventLoopPolicy())
+
 import threading
+import streamlit as st
 from flask import Flask
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from yt_dlp import YoutubeDL
+
+# =====================================================================
+# واجهة مستخدم رسومية بسيطة لترضية منصة Streamlit ومنعها من إغلاق البوت
+# =====================================================================
+st.set_page_config(page_title="YouTube Audio Bot Server", page_icon="⚡")
+st.title("⚡ بوت تحميل صوتيات يوتيوب")
+st.markdown("---")
+st.success("السيرفر يعمل الآن بنجاح على منصة Streamlit Community Cloud!")
+st.info("يتم الآن تشغيل البوت وسيرفر Flask في الخلفية طوال الـ 24 ساعة.")
+st.write(f"**قناة البوت:** `@lb2_c` | **المطور:** `@Eror_7`")
 
 # =====================================================================
 # جزء سيرفر الويب (Flask) لمنع خوادم الاستضافة من إغلاق أو تعطيل البوت
@@ -133,20 +156,22 @@ async def download_audio(client: Client, message: Message):
             os.remove(file_path)
 
 # الدالة الأساسية لتشغيل البوت بنظام حلقة أحداث مستقرة (Event Loop) للتعامل الصحيح مع الاستضافة وبايثون الحديث
-async def main():
+async def start_bot():
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
     
     print("جاري بدء تشغيل بوت تليجرام...")
     await app.start()
     print("البوت يعمل الآن بنجاح وبدون توقف!")
-    
-    # الحفاظ على البوت نشطاً ومستمعاً للطلبات بصورة مستمرة وآمنة
     await asyncio.Event().wait()
 
-if __name__ == "__main__":
-    try:
-        # تشغيل الدالة الأساسية عبر نظام إدارة المهام الرسمي لمنع مشاكل الـ Weak References نهائياً
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        print("تم إيقاف البوت يدوياً.")
+# دالة وسيطة لتشغيل الـ async داخل الـ Thread الفرعي التابع لـ Streamlit
+def run_bot_in_thread():
+    bot_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(bot_loop)
+    bot_loop.run_until_complete(start_bot())
+
+# تفعيل تشغيل البوت في الخلفية لمرة واحدة فقط لضمان عدم التكرار عند إعادة تحميل الصفحة
+if "bot_started" not in st.session_state:
+    st.session_state.bot_started = True
+    threading.Thread(target=run_bot_in_thread, daemon=True).start()
