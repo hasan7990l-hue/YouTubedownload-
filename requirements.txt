@@ -1,5 +1,3 @@
 streamlit
-flask
-pyrogram
-tgcrypto
-yt-dlp>=2025.01.01
+telethon
+yt-dlp
