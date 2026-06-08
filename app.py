@@ -1,18 +1,23 @@
 import logging
 import streamlit as st
+import asyncio
+from threading import Thread
+import nest_asyncio
 from telethon import TelegramClient, events, Button
 from telethon.errors import UserNotParticipantError
 from telethon.tl.functions.channels import GetParticipantRequest
 from telethon.tl.functions.channels import GetParticipantRequest as GetGroupParticipantRequest
 from telethon.tl.types import ChannelParticipantAdmin, ChannelParticipantCreator
-import asyncio
+
+# تفعيل مكتبة nest_asyncio للسماح بتشغيل الـ Event Loops المتداخلة داخل Streamlit
+nest_asyncio.apply()
 
 # --- 1. إعدادات واجهة Streamlit الأساسية لتشغيل خادم الويب الخاص بك ---
 st.set_page_config(page_title="Group Forced Subscription Bot", page_icon="🛡️")
 st.title("🛡️ خادم بوت الاشتراك الإجباري للمجموعات")
 st.write("الخادم يعمل الآن بنجاح ومستقر 24/7 لحماية المجموعات وإلزام الأعضاء بالاشتراك.")
 
-# إعدادات تسجيل الأخطاء (Logging) لمراقبة عمل البوت ومعرفة سبب عدم الاستجابة
+# إعدادات تسجيل الأخطاء (Logging) لمراقبة عمل البوت
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(module)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -29,18 +34,8 @@ CHANNELS = [
     "@YourChannel2"
 ]
 
-# دالة ذكية لتهيئة البوت وتشغيله كخلفية مستقرة ومتزامنة مع خادم الويب
-if 'bot_client' not in st.session_state:
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-    bot_client = TelegramClient('group_forced_sub_session', API_ID, API_HASH, loop=loop)
-    st.session_state['bot_client'] = bot_client
-else:
-    bot_client = st.session_state['bot_client']
+# تهيئة عميل التليجرام (Telethon Client)
+bot_client = TelegramClient('group_forced_sub_session', API_ID, API_HASH)
 
 # دالة للتحقق مما إذا كان المستخدم مشتركاً في القنوات الإلزامية أم لا
 async def check_subscription(user_id):
@@ -112,7 +107,6 @@ async def callback_handler(event):
 @bot_client.on(events.NewMessage)
 async def group_protection_handler(event):
     if event.is_group or event.is_channel:
-        # تجنب معالجة الرسائل الفارغة أو الأوامر الأساسية مثل start
         if event.text.startswith('/start'):
             return
             
@@ -149,20 +143,23 @@ async def group_protection_handler(event):
             except Exception:
                 pass
 
-# --- 6. تشغيل النظام والربط الحركي الخارجي المستمر ---
-async def start_bot():
-    if not bot_client.is_connected():
-        await bot_client.start(bot_token=BOT_TOKEN)
-    await bot_client.run_until_disconnected()
+# --- 6. آلية التشغيل الآمنة بالخلفية لبيئة Streamlit ---
 
-# تشغيل البوت عبر جلب الـ Loop النشط الخاص بـ Streamlit فورياً لضمان الاستجابة
-try:
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        loop.create_task(start_bot())
-    else:
-        loop.run_until_complete(start_bot())
-except Exception as e:
-    logger.error(f"خطأ في تشغيل الـ loop: {e}")
+def run_telethon_bot():
+    # إنشاء وحقن Loop مستقل ومحمي للبوت داخل الـ Thread الجديد
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    nest_asyncio.apply()
+    
+    # تشغيل البوت بشكل دائم وثابت
+    bot_client.start(bot_token=BOT_TOKEN)
+    print("⚡ تم تشغيل واستجابة البوت في الخلفية بنجاح واحترافية...")
+    loop.run_until_complete(bot_client.run_until_disconnected())
 
-st.success("⚡ تم إطلاق الاتصال المباشر واستجابة الأحداث فورياً للمجموعات بنجاح.")
+# تشغيل الـ Thread لمرة واحدة فقط لضمان عدم تكرار الاتصال عند تحديث الصفحة
+if 'bot_thread_started' not in st.session_state:
+    st.session_state['bot_thread_started'] = True
+    bot_thread = Thread(target=run_telethon_bot, daemon=True)
+    bot_thread.start()
+
+st.success("⚡ تم إطلاق الاتصال والربط المتوازي؛ البوت يستمع الآن للمجموعات بصفة مستمرة.")
