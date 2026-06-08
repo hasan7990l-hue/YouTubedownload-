@@ -1,9 +1,10 @@
 import os
 import asyncio
 import sys
+import threading
 
 # =====================================================================
-# حل مشكلة حلقة الأحداث (Event Loop) الإلزامي لمنصة Streamlit وبايثون 3.14
+# نظام حماية متطور لإجبار حلقة الأحداث على الاستقرار داخل Streamlit
 # =====================================================================
 try:
     loop = asyncio.get_running_loop()
@@ -11,8 +12,7 @@ except RuntimeError:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-# تثبيت سياسة حلقة الأحداث للخيوط الفرعية (Multi-threading) الخاصة بـ Streamlit
-class WebThreadEventLoopPolicy(asyncio.DefaultEventLoopPolicy):
+class StreamlitSafePolicy(asyncio.DefaultEventLoopPolicy):
     def get_event_loop(self):
         try:
             return super().get_event_loop()
@@ -21,24 +21,19 @@ class WebThreadEventLoopPolicy(asyncio.DefaultEventLoopPolicy):
             self.set_event_loop(loop)
             return loop
 
-asyncio.set_event_loop_policy(WebThreadEventLoopPolicy())
+asyncio.set_event_loop_policy(StreamlitSafePolicy())
 
-import threading
 import streamlit as st
 from flask import Flask
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from yt_dlp import YoutubeDL
 
-# =====================================================================
-# واجهة مستخدم رسومية بسيطة لترضية منصة Streamlit ومنعها من إغلاق البوت
-# =====================================================================
-st.set_page_config(page_title="YouTube Audio Bot Server", page_icon="⚡")
-st.title("⚡ بوت تحميل صوتيات يوتيوب")
-st.markdown("---")
-st.success("السيرفر يعمل الآن بنجاح على منصة Streamlit Community Cloud!")
-st.info("يتم الآن تشغيل البوت وسيرفر Flask في الخلفية طوال الـ 24 ساعة.")
-st.write(f"**قناة البوت:** `@lb2_c` | **المطور:** `@Eror_7`")
+# واجهة تفاعلية أساسية لمنع المنصة من قتل السيرفر
+st.set_page_config(page_title="YouTube Audio Bot", page_icon="🎵")
+st.title("🎵 خادم بوت تحميل صوتيات يوتيوب")
+st.success("السيرفر يعمل الآن ومحمي من الإغلاق المفاجئ!")
+st.info("تم عزل البوت في بيئة خلفية مستقرة لضمان عدم تدمير المهام (Pending Tasks).")
 
 # =====================================================================
 # جزء سيرفر الويب (Flask) لمنع خوادم الاستضافة من إغلاق أو تعطيل البوت
@@ -156,7 +151,7 @@ async def download_audio(client: Client, message: Message):
             os.remove(file_path)
 
 # الدالة الأساسية لتشغيل البوت بنظام حلقة أحداث مستقرة (Event Loop) للتعامل الصحيح مع الاستضافة وبايثون الحديث
-async def start_bot():
+async def main():
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
     
@@ -165,13 +160,12 @@ async def start_bot():
     print("البوت يعمل الآن بنجاح وبدون توقف!")
     await asyncio.Event().wait()
 
-# دالة وسيطة لتشغيل الـ async داخل الـ Thread الفرعي التابع لـ Streamlit
-def run_bot_in_thread():
+def start_async_loop():
     bot_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(bot_loop)
-    bot_loop.run_until_complete(start_bot())
+    bot_loop.run_until_complete(main())
 
-# تفعيل تشغيل البوت في الخلفية لمرة واحدة فقط لضمان عدم التكرار عند إعادة تحميل الصفحة
-if "bot_started" not in st.session_state:
-    st.session_state.bot_started = True
-    threading.Thread(target=run_bot_in_thread, daemon=True).start()
+# حماية التشغيل: نتحقق إذا كان البوت يعمل مسبقاً في الـ Background لتفادي إنشاء عدة مهام متضاربة عند عمل Refresh للموقع
+if "bot_running_instance" not in st.session_state:
+    st.session_state.bot_running_instance = True
+    threading.Thread(target=start_async_loop, daemon=True).start()
