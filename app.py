@@ -168,24 +168,17 @@ async def download_audio(client: Client, message: Message):
             os.remove(file_path)
 
 # الدالة الأساسية لتشغيل البوت بنظام حلقة أحداث مستقرة (Event Loop) للتعامل الصحيح مع الاستضافة وبايثون الحديث
-async def main():
+def start_pyrogram_bot():
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
-    
-    print("جاري بدء تشغيل بوت تليجرام...")
-    await app.start()
-    print("البوت يعمل الآن بنجاح وبدون توقف!")
-    await asyncio.Event().wait()
-
-def start_async_loop():
-    bot_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(bot_loop)
-    bot_loop.run_until_complete(main())
+    print("جاري بدء تشغيل بوت تليجرام عبر آلية الخلفية المباشرة...")
+    # الاعتماد على app.run لتشغيل واستقبال الأحداث بشكل مستقل ومنع تعليق خيط التحديثات
+    app.run()
 
 # حماية التشغيل القصوى (Global Server Scope): نتحقق عبر البيئة العامة للسيرفر لمنع التضارب نهائياً عند Refresh
 if os.environ.get("BOT_RUNNING_GLOBAL") is None:
     os.environ["BOT_RUNNING_GLOBAL"] = "true"
-    threading.Thread(target=start_async_loop, daemon=True).start()
+    threading.Thread(target=start_pyrogram_bot, daemon=True).start()
 
 # للحفاظ على استقرار واجهة المستخدم الفردية لكل مستخدم داخل Streamlit
 if "bot_running_instance" not in st.session_state:
