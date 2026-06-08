@@ -4,6 +4,7 @@ import asyncio
 import threading
 import streamlit as st
 from telethon import TelegramClient, events, Button
+from telethon.sessions import MemorySession
 from yt_dlp import YoutubeDL
 
 # --- إعداد واجهة Streamlit الرسومية ---
@@ -11,7 +12,7 @@ st.set_page_config(page_title="خادم بوت تحميل يوتيوب", page_ic
 
 st.markdown("<h1 style='text-align: center;'>🎵 خادم بوت تحميل صوتيات وفيديوهات يوتيوب</h1>", unsafe_allow_html=True)
 st.success("🟢 السيرفر يعمل الآن ومحمي من الإغلاق المفاجئ!")
-st.info("🔹 تم عزل البوت في بيئة خلفية مستقرة لضمان عدم تدمير المهام المعلقة (Pending Tasks).")
+st.info("🔹 تم حل مشكلة (Database is locked) وتحويل الجلسة إلى الذاكرة المؤقتة لضمان استقرار كامل.")
 
 # --- البيانات الخاصة بك ---
 API_ID = 27485469
@@ -27,18 +28,19 @@ def is_youtube_url(url):
 
 # --- دالة تشغيل البوت الأساسية ---
 def run_telegram_bot():
-    # إنشاء حلقة أحداث (Event Loop) جديدة وخاصة بهذا الـ Thread
+    # إنشاء حلقة أحداث جديدة وخاصة بالخلفية
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
-    bot = TelegramClient('yt_downloader_session', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+    # استخدام MemorySession() لمنع قفل قاعدة البيانات sqlite3 نهائياً على الاستضافة
+    bot = TelegramClient(MemorySession(), API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
     # --- حدث بدء التشغيل /start ---
     @bot.on(events.NewMessage(pattern='/start'))
     async def start_handler(event):
         first_name = event.sender.first_name or "المستخدم"
         welcome_text = (
-            f"🙋‍♂️ أهلاً بك يا {first_name} في بوت تحميل يوتيوب السريع على استضافة Streamlit!\n\n"
+            f"🙋‍♂️ أهلاً بك يا {first_name} في بوت تحميل يوتيوب السريع المستقر!\n\n"
             f"📥 كل ما عليك فعله هو إرسال رابط الفيديو من اليوتيوب، وسأقوم بتحميله لك مباشرة (فيديو أو صوت).\n\n"
             f"قناة السورس: {SOURCE_CHANNEL}"
         )
@@ -82,7 +84,7 @@ def run_telegram_bot():
         except Exception as e:
             await status_msg.edit("❌ حدث خطأ أثناء جلب تفاصيل الرابط. تأكد من أن الرابط عام وصحيح.")
 
-    # --- حدث الضغط على أزرار التحميل inline ---
+    # --- حدث الضغط على أزرار التحميل ---
     @bot.on(events.CallbackQuery)
     async def callback_handler(event):
         data = event.data.decode('utf-8')
@@ -133,10 +135,11 @@ def run_telegram_bot():
             if 'filename' in locals() and os.path.exists(filename):
                 os.remove(filename)
 
-    # تشغيل الحلقات اللانهائية للبوت
+    # تشغيل البوت بشكل مستمر ومستقر
     bot.run_until_disconnected()
 
-# --- منع التكرار وتشغيل البوت في الخلفية (Thread-safe) ---
-if "bot_started" not in st.session_state:
-    st.session_state.bot_started = True
-    threading.Thread(target=run_telegram_bot, daemon=True).start()
+# --- حماية لمنع تكرار تشغيل الخيوط الخلفية عند التحديث ---
+if "bot_thread_started" not in st.session_state:
+    st.session_state.bot_thread_started = True
+    t = threading.Thread(target=run_telegram_bot, daemon=True)
+    t.start()
