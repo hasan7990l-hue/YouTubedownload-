@@ -57,7 +57,7 @@ if os.environ.get("FLASK_STARTED") is None:
     threading.Thread(target=run_flask, daemon=True).start()
 
 # =====================================================================
-# إعدادات البوت والبيانات الخاصة بالمطور والمنصة (تم تحديث التوكن الجديد)
+# إعدادات البوت والبيانات الخاصة بالمطور والمنصة
 # =====================================================================
 API_ID = 27485469
 API_HASH = "544459a0701b32741254945b08daebfe"
@@ -168,18 +168,24 @@ async def download_audio(client: Client, message: Message):
             os.remove(file_path)
 
 # الدالة الأساسية لتشغيل البوت بنظام حلقة أحداث مستقرة (Event Loop) للتعامل الصحيح مع الاستضافة وبايثون الحديث
-def start_pyrogram_bot():
+async def main_async_loop():
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
-    print("جاري بدء تشغيل بوت تليجرام عبر آلية الخلفية المباشرة...")
-    
-    # تعطيل الـ signals ليعمل البوت داخل خيوط الـ Thread بدون التسبب في ValueError
-    app.run(signals=False)
+    print("جاري بدء تشغيل بوت تليجرام في الخلفية العميقة...")
+    await app.start()
+    print("البوت يعمل الآن بنجاح وبدون توقف واستجابة الروابط فعالة!")
+    while True:
+        await asyncio.sleep(3600)
+
+def start_bot_thread():
+    bot_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(bot_loop)
+    bot_loop.run_until_complete(main_async_loop())
 
 # حماية التشغيل القصوى (Global Server Scope): نتحقق عبر البيئة العامة للسيرفر لمنع التضارب نهائياً عند Refresh
 if os.environ.get("BOT_RUNNING_GLOBAL") is None:
     os.environ["BOT_RUNNING_GLOBAL"] = "true"
-    threading.Thread(target=start_pyrogram_bot, daemon=True).start()
+    threading.Thread(target=start_bot_thread, daemon=True).start()
 
 # للحفاظ على استقرار واجهة المستخدم الفردية لكل مستخدم داخل Streamlit
 if "bot_running_instance" not in st.session_state:
