@@ -57,14 +57,26 @@ if os.environ.get("FLASK_STARTED") is None:
     threading.Thread(target=run_flask, daemon=True).start()
 
 # =====================================================================
-# إعدادات البوت والبيانات الخاصة بالمطور والمنصة
+# إعدادات البوت والبيانات الخاصة بالمطور والمنصة (تم تحديث التوكن الجديد)
 # =====================================================================
 API_ID = 27485469
 API_HASH = "544459a0701b32741254945b08daebfe"
-BOT_TOKEN = "8277082493:AAExFWp3SUp375JcH3RgXprf8wwU3JZZCi4"
+BOT_TOKEN = "8277082493:AAEQqEjaTKPKGs7TXwcNR4cpyrLfoCZzJk4"
 DEVELOPER_ID = 8456056018
 DEVELOPER_USERNAME = "@Eror_7"
 BOT_CHANNEL = "@lb2_c"
+
+# تنظيف ملفات الجلسة المغلقة أو التالفة مسبقاً لضمان بدء تشغيل فوري بدون تعليق
+if os.path.exists("yt_audio_bot.session"):
+    try:
+        os.remove("yt_audio_bot.session")
+    except Exception:
+        pass
+if os.path.exists("yt_audio_bot.session-journal"):
+    try:
+        os.remove("yt_audio_bot.session-journal")
+    except Exception:
+        pass
 
 # تكوين البوت مع إجبار الاستخدام على IPv4 لمنع حظر خوادم Hugging Face وتجنب فشل الاتصال (sign_in_bot)
 app = Client(
