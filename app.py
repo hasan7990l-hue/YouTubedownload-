@@ -295,7 +295,8 @@ async def callback_handler(event):
         await event.delete()
 
 # استقبال الرسائل النصية والميديا الخاصة بالمدخلات للمطور في الخاص
-@bot_client.on(events.NewMessage(incoming=True, private=True))
+# تم تعديل السطر التالي ليتوافق تماماً مع بناء وفلترة مكتبة Telethon الصحيحة من خلال إزالة الاقواس الخاطئة
+@bot_client.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
 async def admin_input_handler(event):
     user_id = event.sender_id
     if user_id != DEVELOPER_ID or user_id not in BOT_CONFIG["awaiting_input"]:
