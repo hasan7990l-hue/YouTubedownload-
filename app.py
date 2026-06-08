@@ -1,192 +1,142 @@
 import os
+import re
 import asyncio
-import sys
 import threading
-
-# =====================================================================
-# نظام حماية متطور لإجبار حلقة الأحداث على الاستقرار داخل Streamlit
-# =====================================================================
-try:
-    loop = asyncio.get_running_loop()
-except RuntimeError:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-class StreamlitSafePolicy(asyncio.DefaultEventLoopPolicy):
-    def get_event_loop(self):
-        try:
-            return super().get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            self.set_event_loop(loop)
-            return loop
-
-asyncio.set_event_loop_policy(StreamlitSafePolicy())
-
 import streamlit as st
-from flask import Flask
-from pyrogram import Client, filters
-from pyrogram.types import Message
+from telethon import TelegramClient, events, Button
 from yt_dlp import YoutubeDL
 
-# واجهة تفاعلية أساسية لمنع المنصة من قتل السيرفر
-st.set_page_config(page_title="YouTube Audio Bot", page_icon="🎵")
-st.title("🎵 خادم بوت تحميل صوتيات يوتيوب")
-st.success("السيرفر يعمل الآن ومحمي من الإغلاق المفاجئ!")
-st.info("تم عزل البوت في بيئة خلفية مستقرة لضمان عدم تدمير المهام (Pending Tasks).")
+# --- إعداد واجهة Streamlit الرسومية ---
+st.set_page_config(page_title="خادم بوت تحميل يوتيوب", page_icon="🎵", layout="centered")
 
-# =====================================================================
-# جزء سيرفر الويب (Flask) لمنع خوادم الاستضافة من إغلاق أو تعطيل البوت
-# =====================================================================
-flask_app = Flask(__name__)
+st.markdown("<h1 style='text-align: center;'>🎵 خادم بوت تحميل صوتيات وفيديوهات يوتيوب</h1>", unsafe_allow_html=True)
+st.success("🟢 السيرفر يعمل الآن ومحمي من الإغلاق المفاجئ!")
+st.info("🔹 تم عزل البوت في بيئة خلفية مستقرة لضمان عدم تدمير المهام المعلقة (Pending Tasks).")
 
-@flask_app.route('/')
-def home():
-    return "Bot is Running Live and Healthy 2026!"
-
-def run_flask():
-    # تشغيل السيرفر على البورت المحدد ليتوافق مع الحاوية والاستضافة
-    try:
-        flask_app.run(host="0.0.0.0", port=7860, use_reloader=False)
-    except Exception as e:
-        print(f"Flask Server Notification: {e}")
-
-# استخدام قفل على مستوى نظام التشغيل (Global Environment) لمنع تكرار تشغيل السيرفر والبوت عند الـ Refresh
-if os.environ.get("FLASK_STARTED") is None:
-    os.environ["FLASK_STARTED"] = "true"
-    threading.Thread(target=run_flask, daemon=True).start()
-
-# =====================================================================
-# إعدادات البوت والبيانات الخاصة بالمطور والمنصة
-# =====================================================================
+# --- البيانات الخاصة بك ---
 API_ID = 27485469
 API_HASH = "544459a0701b32741254945b08daebfe"
-BOT_TOKEN = "8277082493:AAEQqEjaTKPKGs7TXwcNR4cpyrLfoCZzJk4"
-DEVELOPER_ID = 8456056018
-DEVELOPER_USERNAME = "@Eror_7"
-BOT_CHANNEL = "@lb2_c"
+BOT_TOKEN = "8180650384:AAG6ZhD7YxQk1nHOL7xhOVCbqQ_8XvOadQ0"
+DEV_ID = 8456056018
+SOURCE_CHANNEL = "@lb2_c"
 
-# تنظيف ملفات الجلسة المغلقة أو التالفة مسبقاً لضمان بدء تشغيل فوري بدون تعليق
-if os.path.exists("yt_audio_bot.session"):
-    try:
-        os.remove("yt_audio_bot.session")
-    except Exception:
-        pass
-if os.path.exists("yt_audio_bot.session-journal"):
-    try:
-        os.remove("yt_audio_bot.session-journal")
-    except Exception:
-        pass
+# دالة للتحقق من صحة روابط يوتيوب
+def is_youtube_url(url):
+    youtube_regex = r'(https?://)?(www\.)?(youtube|youtu|youtube-nocookie)\.(com|be)/(watch\?v=|embed/|v/|.+\?v=)?([^&=%\?\{\}\s]+)'
+    return re.match(youtube_regex, url)
 
-# تكوين البوت مع إجبار الاستخدام على IPv4 لمنع حظر خوادم Hugging Face وتجنب فشل الاتصال (sign_in_bot)
-app = Client(
-    "yt_audio_bot", 
-    api_id=API_ID, 
-    api_hash=API_HASH, 
-    bot_token=BOT_TOKEN,
-    ipv6=False  # هذا السطر يمنع انقطاع الاتصال بخوادم تليجرام داخل الحاوية
-)
-
-@app.on_message(filters.command("start") & filters.private)
-async def start_command(client: Client, message: Message):
-    start_text = (
-        "**أهلاً بك في بوت تحميل صوتيات يوتيوب!**\n\n"
-        "أرسل لي أي رابط من يوتيوب وسأقوم بتحميله وإرساله لك كملف صوتي فوراً.\n\n"
-        f"**قناة البوت:** {BOT_CHANNEL}\n"
-        f"**المبرمج:** {DEVELOPER_USERNAME}"
-    )
-    await message.reply_text(start_text)
-
-@app.on_message(filters.text & filters.private)
-async def download_audio(client: Client, message: Message):
-    url = message.text.strip()
+# --- دالة تشغيل البوت الأساسية ---
+def run_telegram_bot():
+    # إنشاء حلقة أحداث (Event Loop) جديدة وخاصة بهذا الـ Thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
-    # التحقق من أن النص المرسل يحتوي على رابط يوتيوب
-    if "youtube.com" not in url and "youtu.be" not in url:
-        await message.reply_text("**عذراً، يرجى إرسال رابط يوتيوب صحيح فقط.**")
-        return
+    bot = TelegramClient('yt_downloader_session', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-    status_message = await message.reply_text("**جاري معالجة الرابط وتحميل الصوت... انتظر قليلاً**")
-    
-    # إعدادات تحويل الصوت باستخدام yt-dlp و ffmpeg مع دمج الكوكيز وحل مشكلة محاكاة المتصفح بالكامل
-    outtmpl = f"downloads/{message.from_user.id}_%(title)s.%(ext)s"
-    ydl_opts = {
-        'format': 'ba/b',             # تم استخدام الاختصار البرمجي ba/b لتوسيع نطاق قبول أفضل صيغة صوتية متاحة دون قيود صارمة
-        'outtmpl': outtmpl,
-        'cookiefile': 'cookies.txt',  # استخدام الكوكيز لتخطي الحظر الأمني
-        'nocheckcertificate': True,   # تخطي فحص شهادات SSL لتفادي انقطاع الاتصال EOF
-        'source_address': '0.0.0.0',  # إجبار الخادم على استخدام IPv4 بدلاً من IPv6 المستهدف بالحظر
-        'ignoreerrors': True,         # تخطي الأخطاء الطفيفة أثناء جلب البيانات لضمان استمرار التحميل
-        'http_headers': {             # إضافة حزمة رؤوس طلبات كاملة لمحاكاة متصفح حقيقي ومنع الـ NoneType
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Sec-Fetch-Mode': 'navigate',
-        },
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'quiet': True
-    }
+    # --- حدث بدء التشغيل /start ---
+    @bot.on(events.NewMessage(pattern='/start'))
+    async def start_handler(event):
+        first_name = event.sender.first_name or "المستخدم"
+        welcome_text = (
+            f"🙋‍♂️ أهلاً بك يا {first_name} في بوت تحميل يوتيوب السريع على استضافة Streamlit!\n\n"
+            f"📥 كل ما عليك فعله هو إرسال رابط الفيديو من اليوتيوب، وسأقوم بتحميله لك مباشرة (فيديو أو صوت).\n\n"
+            f"قناة السورس: {SOURCE_CHANNEL}"
+        )
+        buttons = [
+            [Button.url("قناة السورس", f"https://t.me/{SOURCE_CHANNEL.replace('@', '')}")],
+            [Button.url("المطور", f"tg://user?id={DEV_ID}")]
+        ]
+        await event.respond(welcome_text, buttons=buttons)
 
-    try:
-        # استخدام loop الحالي بشكل آمن متوافق مع جميع إصدارات بايثون المستقرة والحديثة
-        loop = asyncio.get_running_loop()
-        with YoutubeDL(ydl_opts) as ydl:
-            # استخراج البيانات مع التحقق الكامل لمنع أخطاء NoneType
-            info = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=True))
+    # --- حدث استقبال الروابط وتحميلها ---
+    @bot.on(events.NewMessage)
+    async def download_handler(event):
+        if event.text.startswith('/'):
+            return
+
+        url = event.text.strip()
+        if not is_youtube_url(url):
+            return
             
-            if info is None:
-                await status_message.edit_text("**عذراً، فشل يوتيوب في الاستجابة للطلب أو الرابط غير صالح. يرجى تجديد ملف cookies.txt الخاص بك.**")
-                return
+        status_msg = await event.respond("🔍 جاري جلب معلومات الفيديو والتحقق من الرابط، يرجى الانتظار...")
+        
+        try:
+            ydl_opts = {'quiet': True, 'no_warnings': True}
+            with YoutubeDL(ydl_opts) as ydl:
+                info_dict = ydl.extract_info(url, download=False)
+                video_title = info_dict.get('title', 'فيديو يوتيوب')
+                video_duration = info_dict.get('duration', 0)
                 
-            file_path = ydl.prepare_filename(info).rsplit('.', 1)[0] + ".mp3"
+                if video_duration > 7200:
+                    await status_msg.edit("⚠️ عذراً، لا يمكن تحميل مقاطع فيديو تزيد مدتها عن ساعتين.")
+                    return
 
-        if os.path.exists(file_path):
-            await status_message.edit_text("**جاري رفع الملف الصوتي إلى تليجرام...**")
-            
-            # إرسال الملف الصوتي للمستخدم
-            caption_text = (
-                "**تم التحميل بنجاح بواسطة البوت**\n\n"
-                f"**قناة البوت:** {BOT_CHANNEL}\n"
-                f"**المطور:** {DEVELOPER_USERNAME}"
-            )
-            await message.reply_audio(audio=file_path, caption=caption_text)
-            
-            # حذف الملف بعد الإرسال للحفاظ على مساحة الاستضافة
-            os.remove(file_path)
-            await status_message.delete()
+            await status_msg.delete()
+            choice_text = f"🎬 **العنوان:** {video_title}\n\n⏱ **المدة:** {video_duration // 60} دقيقة.\n\n اختر صيغة التحميل المناسبة لك أدناه:"
+            buttons = [
+                [Button.inline("🎥 تحميل كـ فيديو (MP4)", data=f"vid_{info_dict['id']}")],
+                [Button.inline("🎵 تحميل كـ صوت (MP3)", data=f"aud_{info_dict['id']}")]
+            ]
+            await event.respond(choice_text, buttons=buttons)
+
+        except Exception as e:
+            await status_msg.edit("❌ حدث خطأ أثناء جلب تفاصيل الرابط. تأكد من أن الرابط عام وصحيح.")
+
+    # --- حدث الضغط على أزرار التحميل inline ---
+    @bot.on(events.CallbackQuery)
+    async def callback_handler(event):
+        data = event.data.decode('utf-8')
+        video_id = data.split('_')[1]
+        download_type = data.split('_')[0]
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        
+        await event.answer("📥 بدأت عملية المعالجة والتحميل...", alert=False)
+        progress_msg = await event.edit("⚡️ جاري تحميل الملف من سيرفرات يوتيوب إلى الاستضافة...")
+
+        os.makedirs("downloads", exist_ok=True)
+        outtmpl = f"downloads/{video_id}_%(title)s.%(ext)s"
+
+        if download_type == "vid":
+            ydl_opts = {'format': 'best[ext=mp4]/best', 'outtmpl': outtmpl, 'quiet': True}
         else:
-            await status_message.edit_text("**حدث خطأ أثناء معالجة الملف الصوتي.**")
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'outtmpl': outtmpl,
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+                'quiet': True,
+            }
 
-    except Exception as e:
-        await status_message.edit_text(f"**حدث خطأ غير متوقع أثناء التحميل:**\n`{str(e)}`")
-        # تنظيف أي ملف قد يكون قد تم تحميله جزئياً في حال حدوث خطأ
-        if 'file_path' in locals() and os.path.exists(file_path):
-            os.remove(file_path)
+        try:
+            with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(video_url, download=True)
+                filename = ydl.prepare_filename(info)
+                if download_type == "aud":
+                    filename = os.path.splitext(filename)[0] + ".mp3"
 
-# الدالة الأساسية لتشغيل البوت بنظام حلقة أحداث مستقرة (Event Loop) للتعامل الصحيح مع الاستضافة وبايثون الحديث
-async def main_async_loop():
-    if not os.path.exists("downloads"):
-        os.makedirs("downloads")
-    print("جاري بدء تشغيل بوت تليجرام في الخلفية العميقة...")
-    await app.start()
-    print("البوت يعمل الآن بنجاح وبدون توقف واستجابة الروابط فعالة!")
-    while True:
-        await asyncio.sleep(3600)
+            await progress_msg.edit("🚀 جاري رفع الملف الآن إلى تليجرام...")
+            
+            if download_type == "vid":
+                await bot.send_file(event.chat_id, filename, caption=f"🎬 تم التحميل بنجاح عبر {SOURCE_CHANNEL}", supports_streaming=True)
+            else:
+                await bot.send_file(event.chat_id, filename, caption=f"🎵 تم تحميل الصوت بنجاح عبر {SOURCE_CHANNEL}")
+                
+            if os.path.exists(filename):
+                os.remove(filename)
+            await progress_msg.delete()
 
-def start_bot_thread():
-    bot_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(bot_loop)
-    bot_loop.run_until_complete(main_async_loop())
+        except Exception as e:
+            await progress_msg.edit("❌ عذراً، فشل تحميل ومعالجة الملف بسبب حجمه الكبير أو قيود اليوتيوب.")
+            if 'filename' in locals() and os.path.exists(filename):
+                os.remove(filename)
 
-# حماية التشغيل القصوى (Global Server Scope): نتحقق عبر البيئة العامة للسيرفر لمنع التضارب نهائياً عند Refresh
-if os.environ.get("BOT_RUNNING_GLOBAL") is None:
-    os.environ["BOT_RUNNING_GLOBAL"] = "true"
-    threading.Thread(target=start_bot_thread, daemon=True).start()
+    # تشغيل الحلقات اللانهائية للبوت
+    bot.run_until_disconnected()
 
-# للحفاظ على استقرار واجهة المستخدم الفردية لكل مستخدم داخل Streamlit
-if "bot_running_instance" not in st.session_state:
-    st.session_state.bot_running_instance = True
+# --- منع التكرار وتشغيل البوت في الخلفية (Thread-safe) ---
+if "bot_started" not in st.session_state:
+    st.session_state.bot_started = True
+    threading.Thread(target=run_telegram_bot, daemon=True).start()
