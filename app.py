@@ -46,10 +46,15 @@ def home():
 
 def run_flask():
     # تشغيل السيرفر على البورت المحدد ليتوافق مع الحاوية والاستضافة
-    flask_app.run(host="0.0.0.0", port=7860)
+    try:
+        flask_app.run(host="0.0.0.0", port=7860, use_reloader=False)
+    except Exception as e:
+        print(f"Flask Server Notification: {e}")
 
-# تشغيل سيرفر الويب في خيط خلفي (Thread) مستقل لمنع تجميد حلقة البوت الأساسية
-threading.Thread(target=run_flask, daemon=True).start()
+# استخدام قفل على مستوى نظام التشغيل (Global Environment) لمنع تكرار تشغيل السيرفر والبوت عند الـ Refresh
+if os.environ.get("FLASK_STARTED") is None:
+    os.environ["FLASK_STARTED"] = "true"
+    threading.Thread(target=run_flask, daemon=True).start()
 
 # =====================================================================
 # إعدادات البوت والبيانات الخاصة بالمطور والمنصة
@@ -165,7 +170,11 @@ def start_async_loop():
     asyncio.set_event_loop(bot_loop)
     bot_loop.run_until_complete(main())
 
-# حماية التشغيل: نتحقق إذا كان البوت يعمل مسبقاً في الـ Background لتفادي إنشاء عدة مهام متضاربة عند عمل Refresh للموقع
+# حماية التشغيل القصوى (Global Server Scope): نتحقق عبر البيئة العامة للسيرفر لمنع التضارب نهائياً عند Refresh
+if os.environ.get("BOT_RUNNING_GLOBAL") is None:
+    os.environ["BOT_RUNNING_GLOBAL"] = "true"
+    threading.Thread(target=start_async_loop, daemon=True).start()
+
+# للحفاظ على استقرار واجهة المستخدم الفردية لكل مستخدم داخل Streamlit
 if "bot_running_instance" not in st.session_state:
     st.session_state.bot_running_instance = True
-    threading.Thread(target=start_async_loop, daemon=True).start()
