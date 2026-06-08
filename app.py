@@ -172,8 +172,9 @@ def start_pyrogram_bot():
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
     print("جاري بدء تشغيل بوت تليجرام عبر آلية الخلفية المباشرة...")
-    # الاعتماد على app.run لتشغيل واستقبال الأحداث بشكل مستقل ومنع تعليق خيط التحديثات
-    app.run()
+    
+    # تعطيل الـ signals ليعمل البوت داخل خيوط الـ Thread بدون التسبب في ValueError
+    app.run(signals=False)
 
 # حماية التشغيل القصوى (Global Server Scope): نتحقق عبر البيئة العامة للسيرفر لمنع التضارب نهائياً عند Refresh
 if os.environ.get("BOT_RUNNING_GLOBAL") is None:
