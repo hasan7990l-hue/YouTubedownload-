@@ -1,4 +1,4 @@
 flask
-nest_asyncio
-telethon
+pyrogram
+tgcrypto
 yt-dlp>=2025.01.01
