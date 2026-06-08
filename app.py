@@ -63,16 +63,17 @@ def run_telegram_bot():
 
         status_msg = await event.respond("🔍 جاري فحص الرابط وتخطي الحماية، يرجى الانتظار...")
         
-        # إعدادات تمويه مخصصة للسيرفرات لكسر حظر يوتيوب 2026 والاعتماد على الكوكيز المرفوعة
+        # إعدادات كسر التشفير والحظر المخصصة لسيرفرات Streamlit Cloud لعام 2026
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
+            # تعديل العملاء وتجاوز قيود فك التشفير لروابط يوتيوب بدقة وعمق
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'ios', 'tvhtml5'],
-                    'skip': ['webpage', 'hls']
+                    'player_client': ['android_embedded', 'web_embedded', 'ios'],
+                    'skip': ['dash', 'hls']
                 }
             }
         }
@@ -96,7 +97,7 @@ def run_telegram_bot():
             await event.respond(choice_text, buttons=buttons)
 
         except Exception as e:
-            print(f"DEBUG ERROR: {str(e)}")
+            print(f"CRITICAL LOG: {str(e)}")
             await status_msg.edit("❌ عذراً، واجه السيرفر قيوداً من يوتيوب أثناء قراءة هذا الرابط.\nيرجى محاولة إرسال رابط فيديو آخر أو التأكد من أن الرابط ليس خاصاً.")
 
     # --- حدث الضغط على أزرار التحميل ---
@@ -120,15 +121,15 @@ def run_telegram_bot():
             'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'ios', 'tvhtml5'],
-                    'skip': ['webpage', 'hls']
+                    'player_client': ['android_embedded', 'web_embedded', 'ios'],
+                    'skip': ['dash', 'hls']
                 }
             }
         }
 
-        # استخدام صيغ مدمجة مباشرة لتجنب الاعتماد الإجباري على المعالجة الخارجية في حال نقص حزم الـ Docker
+        # جلب الجودة الجاهزة والمباشرة لتفادي انهيار البناء الرقمي داخل السيرفر
         if download_type == "vid":
-            base_opts['format'] = 'mp4/best' 
+            base_opts['format'] = 'best[ext=mp4]/best'
         else:
             base_opts['format'] = 'bestaudio/best'
             base_opts['postprocessors'] = [{
@@ -146,6 +147,7 @@ def run_telegram_bot():
                     if download_type == "aud" and os.path.exists(os.path.splitext(filename)[0] + ".mp3"):
                         filename = os.path.splitext(filename)[0] + ".mp3"
             except Exception as inner_error:
+                # حل احتياطي ديناميكي متكامل في حال رفض فلاتر الصوت بالمحاكاة الأولى
                 if download_type == "aud" and 'postprocessors' in base_opts:
                     base_opts.pop('postprocessors')
                     base_opts['format'] = 'bestaudio/best'
