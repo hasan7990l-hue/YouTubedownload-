@@ -117,8 +117,9 @@ def run_telegram_bot():
             'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None
         }
 
+        # تعديل ذكي ومضمون للصيغ والخيارات لتجنب خطأ (Requested format is not available)
         if download_type == "vid":
-            base_opts['format'] = 'best[ext=mp4]/best'
+            base_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
         else:
             base_opts['format'] = 'bestaudio/best'
             base_opts['postprocessors'] = [{
