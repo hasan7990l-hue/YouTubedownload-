@@ -63,16 +63,16 @@ def run_telegram_bot():
 
         status_msg = await event.respond("🔍 جاري فحص الرابط وتخطي الحماية، يرجى الانتظار...")
         
-        # إعدادات كسر التشفير والحظر المخصصة لسيرفرات Streamlit Cloud لعام 2026
+        # كسر التشفير والحماية الصارمة لعام 2026 عبر إجبار النظام على استخدام عميل تلفاز يوتيوب (يخلو من تشفير N-Sig)
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
-            # تعديل العملاء وتجاوز قيود فك التشفير لروابط يوتيوب بدقة وعمق
+            'ignoreerrors': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android_embedded', 'web_embedded', 'ios'],
+                    'player_client': ['tv', 'html5web'], # تخطي كامل لعملاء الويب العادية وهواتف أندرويد المحظورة
                     'skip': ['dash', 'hls']
                 }
             }
@@ -81,6 +81,10 @@ def run_telegram_bot():
         try:
             with YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+                
+                if not info_dict:
+                    raise Exception("تشفير يوتيوب نشط")
+                    
                 video_title = info_dict.get('title', 'فيديو يوتيوب')
                 video_duration = info_dict.get('duration', 0)
                 
@@ -119,17 +123,18 @@ def run_telegram_bot():
             'quiet': True,
             'outtmpl': outtmpl,
             'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
+            'ignoreerrors': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android_embedded', 'web_embedded', 'ios'],
+                    'player_client': ['tv', 'html5web'],
                     'skip': ['dash', 'hls']
                 }
             }
         }
 
-        # جلب الجودة الجاهزة والمباشرة لتفادي انهيار البناء الرقمي داخل السيرفر
+        # استخدام صيغة الفيديو المدمجة المباشرة لتجنب الـ Format Error تماماً
         if download_type == "vid":
-            base_opts['format'] = 'best[ext=mp4]/best'
+            base_opts['format'] = 'best'
         else:
             base_opts['format'] = 'bestaudio/best'
             base_opts['postprocessors'] = [{
@@ -143,11 +148,14 @@ def run_telegram_bot():
             try:
                 with YoutubeDL(base_opts) as ydl:
                     info = ydl.extract_info(video_url, download=True)
-                    filename = ydl.prepare_filename(info)
+                    if info:
+                        filename = ydl.prepare_filename(info)
+                    else:
+                        raise Exception("خطأ تحميل قسري")
+                    
                     if download_type == "aud" and os.path.exists(os.path.splitext(filename)[0] + ".mp3"):
                         filename = os.path.splitext(filename)[0] + ".mp3"
             except Exception as inner_error:
-                # حل احتياطي ديناميكي متكامل في حال رفض فلاتر الصوت بالمحاكاة الأولى
                 if download_type == "aud" and 'postprocessors' in base_opts:
                     base_opts.pop('postprocessors')
                     base_opts['format'] = 'bestaudio/best'
@@ -155,7 +163,8 @@ def run_telegram_bot():
                         info = ydl.extract_info(video_url, download=True)
                         filename = ydl.prepare_filename(info)
                 else:
-                    base_opts['format'] = 'best'
+                    # محاولة طوارئ نهائية لجلب أي صيغة حية للفيديو
+                    base_opts['format'] = 'worst'
                     with YoutubeDL(base_opts) as ydl:
                         info = ydl.extract_info(video_url, download=True)
                         filename = ydl.prepare_filename(info)
