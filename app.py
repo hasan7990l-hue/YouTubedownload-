@@ -1,5 +1,16 @@
 import os
 import asyncio
+
+# =====================================================================
+# حل مشكلة حلقة الأحداث (Event Loop) الإلزامي لمنصة Streamlit وبايثون 3.14
+# =====================================================================
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    # إنشاء حلقة أحداث جديدة وتعيينها كحلقة رئيسية لمنع خطأ الـ RuntimeError نهائياً
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
 import threading
 from flask import Flask
 from pyrogram import Client, filters
