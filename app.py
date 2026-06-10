@@ -500,12 +500,40 @@ async def group_protection_handler(event):
             except Exception:
                 pass
 
-# --- 7. آلية التشغيل المعزولة تماماً وخارج نطاق خيوط Streamlit ---
+# --- 7. نظام خادم الويب المدمج لردع الـ Sleep Mode وتلبية طلبات الـ HTTP ---
+async def handle_http_request(reader, writer):
+    """معالج طلبات الـ HTTP لردع وضع السكون وإرجاع رد ترحيبي"""
+    data = await reader.read(1024)
+    message = data.decode()
+    
+    # تجهيز رد الـ HTTP القياسي لإعلام السيرفر أن الحاوية حية
+    response = (
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html; charset=utf-8\r\n"
+        "Connection: close\r\n\r\n"
+        "<html><body><h1>Bot Server is Alive and Working 24/7!</h1></body></html>"
+    )
+    writer.write(response.encode())
+    await writer.drain()
+    writer.close()
+    await writer.wait_closed()
+
+# --- 8. آلية التشغيل المعزولة تماماً وخارج نطاق خيوط Streamlit ---
 def run_isolated_bot():
     isolated_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(isolated_loop)
     
+    # تشغيل البوت الأساسي
     bot_client.start(bot_token=BOT_TOKEN)
+    
+    # تشغيل خادم HTTP مصغر على المنفذ 8080 (أو أي منفذ تطلبه الاستضافة) للبقاء متصلاً
+    try:
+        server_coro = asyncio.start_server(handle_http_request, '0.0.0.0', 8080)
+        isolated_loop.run_until_complete(server_coro)
+        logger.info("خادم ويب المدمج لمنع السكون تم تفعيله بنجاح على المنفذ 8080")
+    except Exception as server_error:
+        logger.error(f"فشل تشغيل خادم HTTP المدمج (قد يكون المنفذ محجوزاً): {server_error}")
+
     isolated_loop.run_until_complete(bot_client.run_until_disconnected())
 
 if 'bot_process_active' not in st.session_state:
